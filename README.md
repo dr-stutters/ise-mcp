@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (117)
+## Dedicated tools (128)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -53,7 +53,8 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
 
 - **system / deployment** — `ise_version`, `ise_check_surfaces`,
   `ise_deployment_nodes`, `ise_get_node`
-- **endpoints** — list/get/create/delete endpoints (OpenAPI; create returns the id)
+- **endpoints** — list/get/create/update/delete endpoints (OpenAPI; create returns
+  the id) + endpoint custom-attribute definitions (CRUD)
 - **trustsec** — SGTs create/list/get/delete, SGACLs create/list/get/delete,
   egress matrix (SGT reads via OpenAPI; writes + SGACL/egress via ERS)
 - **policy (read)** — policy sets, authN/authZ rules, conditions
@@ -74,7 +75,9 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
   (OpenAPI Rbac Catalog, 3.5+; e.g. create an ERS-Admin account)
 - **network_devices (ERS)** — onboard/list/get/delete NADs + device groups (CRUD)
 - **identity (ERS)** — internal users (create/list/get/delete, group name→id
-  resolved), identity & endpoint groups (create/list/delete)
+  resolved), identity & endpoint groups (create/list/delete), plus external
+  identity reads: Active Directory join points and external RADIUS servers
+- **deployment** — nodes, node-group CRUD (PSN session-failover groups)
 - **raw / spec** — `ise_openapi_call`, `ise_ers_call`, `ise_mnt_call`,
   `ise_openapi_groups`, `ise_search_spec`, `ise_get_definition`
 

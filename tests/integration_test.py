@@ -122,7 +122,9 @@ async def main(write: bool) -> int:
              "ise_license_status", "ise_system_summary", "ise_list_system_certs",
              "ise_list_trusted_certs", "ise_list_csrs", "ise_list_guest_types",
              "ise_list_sponsor_portals", "ise_list_sponsor_groups",
-             "ise_list_profiler_profiles", "ise_list_admin_users"]
+             "ise_list_profiler_profiles", "ise_list_admin_users",
+             "ise_list_active_directory", "ise_list_external_radius_servers",
+             "ise_list_custom_attributes", "ise_list_node_groups"]
     for t in reads:
         await read_check(mcp, t)
     await read_check(mcp, "ise_get_node", hostname="ise")
@@ -211,6 +213,26 @@ async def main(write: bool) -> int:
         rec("SGT update (PUT)", "OK" if ok else "FAIL", f"id={sid}")
     except Exception as e:  # noqa: BLE001
         rec("SGT update (PUT)", "FAIL", e)
+
+    # custom attribute + node group create/delete (name-keyed, OpenAPI)
+    for label, create, cargs, list_tool, name, del_tool in [
+        ("custom attribute", "ise_create_custom_attribute", dict(name="zzz_it_ca"),
+         "ise_list_custom_attributes", "zzz_it_ca", "ise_delete_custom_attribute"),
+        ("node group", "ise_create_node_group", dict(name="zzz_it_ng"),
+         "ise_list_node_groups", "zzz_it_ng", "ise_delete_node_group"),
+    ]:
+        try:
+            await call(mcp, del_tool, name=name)
+            c = await call(mcp, create, **cargs)
+            if is_err(c):
+                rec(label, "FAIL", c[-60:])
+                continue
+            listed = as_list(safe(await call(mcp, list_tool)))
+            made = any((i.get("name") or i.get("attributeName")) == name for i in listed)
+            await call(mcp, del_tool, name=name)
+            rec(label, "OK" if made else "FAIL", f"made={made}")
+        except Exception as e:  # noqa: BLE001
+            rec(label, "FAIL", e)
 
     # policy set + authZ rule (condition resolved by name)
     try:

@@ -37,6 +37,7 @@ _TOOL_MODULES = (
     "sessions",
     "operations",
     "certificates",
+    "customattributes",
     "guest",
     "profiler",
     "rbac",

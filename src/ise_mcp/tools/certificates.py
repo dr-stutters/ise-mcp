@@ -129,6 +129,43 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         return dumps(await client.openapi("DELETE", f"{_SYS}/{host}/{cert_id}"))
 
     @mcp.tool()
+    async def ise_generate_selfsigned_cert(common_name: str, hostname: str | None = None,
+                                           used_for: str = "portal", days: int = 365,
+                                           key_length: str = "2048", key_type: str = "RSA",
+                                           portal_group_tag: str | None = None) -> str:
+        """Generate a self-signed system (identity) certificate on a node.
+
+        Invasive: installs a cert on the node. Won't replace an existing cert
+        (allowReplacementOfCertificates is false), and allows non-resolvable SANs
+        so it works in a lab.
+
+        Args:
+            common_name: subject CN.
+            hostname: node to install on (defaults to the first deployment node).
+            used_for: role - 'portal' (default), 'admin', 'eap', 'radius',
+                'pxgrid', 'saml', or 'tacacs'. Note: the admin/eap/radius roles
+                already have a cert on every node, so those fail unless replaced.
+            days: validity in days.
+            key_length: '2048' (default), '4096'. key_type: 'RSA' or 'ECDSA'.
+            portal_group_tag: required when used_for='portal' (the portal tag).
+        """
+        host = hostname or await _default_host()
+        roles = {r: (r == used_for) for r in
+                 ("admin", "eap", "radius", "portal", "pxgrid", "saml", "tacacs")}
+        body = {"hostName": host, "subjectCommonName": common_name,
+                "keyLength": key_length, "keyType": key_type, "digestType": "SHA-256",
+                "expirationTTL": days, "expirationTTLUnit": "days",
+                "allowExtendedValidity": True, "allowReplacementOfCertificates": False,
+                "allowReplacementOfPortalGroupTag": True,
+                "allowPortalTagTransferForSameSubject": True,
+                "allowRoleTransferForSameSubject": True,
+                "allowSanDnsBadName": True, "allowSanDnsNonResolvable": True, **roles}
+        if portal_group_tag:
+            body["portalGroupTag"] = portal_group_tag
+        return dumps(await client.openapi(
+            "POST", f"{_SYS}/generate-selfsigned-certificate", json_body=body))
+
+    @mcp.tool()
     async def ise_generate_selfsigned_cert_raw(body: str) -> str:
         """Generate a self-signed system certificate from a full JSON body.
 

@@ -133,3 +133,18 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_delete_endpoint_group(group_id: str) -> str:
         """Delete an endpoint identity group by id (ERS)."""
         return dumps(await client.ers("DELETE", f"/ers/config/endpointgroup/{group_id}"))
+
+    @mcp.tool()
+    async def ise_list_active_directory() -> str:
+        """List Active Directory join points (ERS external identity source)."""
+        return dumps(await client.ers_list_all("/ers/config/activedirectory"))
+
+    @mcp.tool()
+    async def ise_get_active_directory(ad_id: str) -> str:
+        """Get one Active Directory join point by id, incl. domain/group detail (ERS)."""
+        return dumps(await client.ers("GET", f"/ers/config/activedirectory/{ad_id}"))
+
+    @mcp.tool()
+    async def ise_list_external_radius_servers() -> str:
+        """List external RADIUS servers (ERS; used for RADIUS proxy/token)."""
+        return dumps(await client.ers_list_all("/ers/config/externalradiusserver"))
