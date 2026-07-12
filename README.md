@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (85)
+## Dedicated tools (108)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -63,7 +63,13 @@ ISE 3.4 and 3.5.
 - **operations (day-2)** — repositories, last-backup status, installed patches,
   smart-licensing status, node groups, and `ise_system_summary` (one-call
   version/nodes/license/patch/backup/sessions dashboard)
-- **certificates** — system & trusted certificate inventory, pending CSRs
+- **certificates** — system & trusted certificate inventory + management: generate
+  CSR, import trusted cert, generate self-signed, delete certs/CSRs
+- **guest / sponsor (ERS)** — guest types, sponsor portals & groups (guest *users*
+  need a sponsor account)
+- **profiler (ERS)** — endpoint profiling policies (compact list + get; raw create/delete)
+- **rbac / admin** — admin users (ERS, 3.4+) and admin groups + admin-user create
+  (OpenAPI Rbac Catalog, 3.5+; e.g. create an ERS-Admin account)
 - **network_devices (ERS)** — onboard/list/get/delete NADs + device groups (CRUD)
 - **identity (ERS)** — internal users (create/list/get/delete, group name→id
   resolved), identity & endpoint groups (create/list/delete)
