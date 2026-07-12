@@ -42,23 +42,26 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (49)
+## Dedicated tools (69)
 
-Every read tool and all five write round-trips (NAD, SGT, SGACL, internal user,
-endpoint create→verify→delete) are verified end-to-end against live ISE 3.4 and
-3.5 (32/32 each).
+Every read tool plus create→verify→delete round-trips for all writable resources
+(NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
+endpoint groups, policy set + authZ rule) are verified end-to-end against live
+ISE 3.4 and 3.5.
 
 - **system / deployment** — `ise_version`, `ise_check_surfaces`,
   `ise_deployment_nodes`, `ise_get_node`
 - **endpoints** — list/get/create/delete endpoints (OpenAPI; create returns the id)
 - **trustsec** — SGTs create/list/get/delete, SGACLs create/list/get/delete,
   egress matrix (SGT reads via OpenAPI; writes + SGACL/egress via ERS)
-- **policy** — network-access & device-admin policy sets, authN/authZ rules,
-  authorization profiles, conditions
+- **policy (read)** — policy sets, authN/authZ rules, conditions
+- **policy authoring** — authorization profiles (create with VLAN/dACL), downloadable
+  ACLs, policy sets + authZ rules (condition resolved by name, e.g. `Wired_802.1X`)
 - **sessions (MnT)** — active session count/list, session by MAC/IP (clean
   "no active session" when idle), failure reasons
-- **network_devices (ERS)** — onboard/list/get/delete NADs + device groups
-- **identity (ERS)** — internal users (create/list/get/delete), identity & endpoint groups
+- **network_devices (ERS)** — onboard/list/get/delete NADs + device groups (CRUD)
+- **identity (ERS)** — internal users (create/list/get/delete, group name→id
+  resolved), identity & endpoint groups (create/list/delete)
 - **raw / spec** — `ise_openapi_call`, `ise_ers_call`, `ise_mnt_call`,
   `ise_openapi_groups`, `ise_search_spec`, `ise_get_definition`
 

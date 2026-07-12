@@ -40,13 +40,21 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         Args:
             name: username.
             password: the user's password.
-            identity_groups: optional identity group name/id to place the user in.
+            identity_groups: optional identity group name or id to place the user
+                in. A name is resolved to its id automatically (ERS stores the id).
             email: optional.
         """
         user: dict = {"name": name, "password": password, "email": email,
                       "enabled": True, "changePassword": False}
         if identity_groups:
-            user["identityGroups"] = identity_groups
+            # ERS wants the group id (CSV). If a name was given, resolve it.
+            gid = identity_groups
+            if "-" not in identity_groups:  # ids are GUIDs; a name has no dashes
+                groups = await client.ers_list_all("/ers/config/identitygroup")
+                match = next((g for g in groups if g.get("name") == identity_groups), None)
+                if match:
+                    gid = match["id"]
+            user["identityGroups"] = gid
         return dumps(await client.ers("POST", _USER,
                                       json_body={"InternalUser": user}))
 
@@ -66,6 +74,35 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         return dumps(await client.ers_list_all("/ers/config/identitygroup"))
 
     @mcp.tool()
+    async def ise_create_identity_group(
+        name: str, description: str = "",
+        parent: str = "NAC Group:NAC:IdentityGroups:User Identity Groups",
+    ) -> str:
+        """Create a user identity group (ERS). Returns the new group's id."""
+        body = {"IdentityGroup": {"name": name, "description": description,
+                                  "parent": parent}}
+        return dumps(await client.ers("POST", "/ers/config/identitygroup",
+                                      json_body=body))
+
+    @mcp.tool()
+    async def ise_delete_identity_group(group_id: str) -> str:
+        """Delete a user identity group by id (ERS)."""
+        return dumps(await client.ers("DELETE", f"/ers/config/identitygroup/{group_id}"))
+
+    @mcp.tool()
     async def ise_list_endpoint_groups() -> str:
         """List endpoint identity groups (ERS)."""
         return dumps(await client.ers_list_all("/ers/config/endpointgroup"))
+
+    @mcp.tool()
+    async def ise_create_endpoint_group(name: str, description: str = "") -> str:
+        """Create an endpoint identity group (ERS). Returns the new group's id."""
+        body = {"EndPointGroup": {"name": name, "description": description,
+                                  "systemDefined": False}}
+        return dumps(await client.ers("POST", "/ers/config/endpointgroup",
+                                      json_body=body))
+
+    @mcp.tool()
+    async def ise_delete_endpoint_group(group_id: str) -> str:
+        """Delete an endpoint identity group by id (ERS)."""
+        return dumps(await client.ers("DELETE", f"/ers/config/endpointgroup/{group_id}"))

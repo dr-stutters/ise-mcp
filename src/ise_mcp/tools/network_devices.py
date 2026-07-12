@@ -78,3 +78,24 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_list_network_device_groups() -> str:
         """List network device groups (ERS)."""
         return dumps(await client.ers_list_all("/ers/config/networkdevicegroup"))
+
+    @mcp.tool()
+    async def ise_create_network_device_group(name: str, root_type: str = "Device Type",
+                                              description: str = "") -> str:
+        """Create a network device group (ERS). Returns the new group's id.
+
+        Args:
+            name: hierarchical group name, e.g. 'Device Type#All Device Types#Switches'.
+            root_type: the root group ('Device Type', 'Location', 'IPSEC', ...).
+            description: optional.
+        """
+        body = {"NetworkDeviceGroup": {"name": name, "description": description,
+                                       "othername": root_type}}
+        return dumps(await client.ers("POST", "/ers/config/networkdevicegroup",
+                                      json_body=body))
+
+    @mcp.tool()
+    async def ise_delete_network_device_group(group_id: str) -> str:
+        """Delete a network device group by id (ERS)."""
+        return dumps(await client.ers("DELETE",
+                                      f"/ers/config/networkdevicegroup/{group_id}"))
