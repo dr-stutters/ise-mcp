@@ -48,6 +48,15 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         return dumps(await client.ers("POST", _SGT, json_body=body))
 
     @mcp.tool()
+    async def ise_update_sgt(sgt_id: str, name: str | None = None,
+                             value: int | None = None,
+                             description: str | None = None) -> str:
+        """Update an SGT's name/value/description (ERS; only given fields change)."""
+        return dumps(await client.ers_update(
+            _SGT, sgt_id, "Sgt",
+            {"name": name, "value": value, "description": description}))
+
+    @mcp.tool()
     async def ise_delete_sgt(sgt_id: str) -> str:
         """Delete an SGT by id (ERS)."""
         return dumps(await client.ers("DELETE", f"{_SGT}/{sgt_id}"))
@@ -66,6 +75,12 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_create_sgacl(body: str) -> str:
         """Create an SGACL from a JSON body ({'Sgacl': {...}}); returns its id. ERS."""
         return dumps(await client.ers("POST", _SGACL, json_body=json.loads(body)))
+
+    @mcp.tool()
+    async def ise_update_sgacl_raw(sgacl_id: str, body: str) -> str:
+        """Update an SGACL from a full JSON body ({'Sgacl': {...}}). ERS PUT."""
+        return dumps(await client.ers("PUT", f"{_SGACL}/{sgacl_id}",
+                                      json_body=json.loads(body)))
 
     @mcp.tool()
     async def ise_delete_sgacl(sgacl_id: str) -> str:

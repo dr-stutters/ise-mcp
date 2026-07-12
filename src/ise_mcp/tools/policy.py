@@ -118,6 +118,17 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         return dumps(await client.ers("POST", _ERS_AP, json_body=json.loads(body)))
 
     @mcp.tool()
+    async def ise_update_authz_profile(profile_id: str, vlan: str | None = None,
+                                       dacl_name: str | None = None,
+                                       description: str | None = None) -> str:
+        """Update an authorization profile's VLAN/dACL/description (ERS)."""
+        changes: dict = {"daclName": dacl_name, "description": description}
+        if vlan is not None:
+            changes["vlan"] = {"nameID": vlan, "tagID": 1}
+        return dumps(await client.ers_update(
+            _ERS_AP, profile_id, "AuthorizationProfile", changes))
+
+    @mcp.tool()
     async def ise_delete_authz_profile(profile_id: str) -> str:
         """Delete an authorization profile by id (ERS)."""
         return dumps(await client.ers("DELETE", f"{_ERS_AP}/{profile_id}"))
@@ -147,6 +158,14 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         body = {"DownloadableAcl": {"name": name, "dacl": dacl,
                                     "daclType": dacl_type, "description": description}}
         return dumps(await client.ers("POST", _ERS_DACL, json_body=body))
+
+    @mcp.tool()
+    async def ise_update_dacl(dacl_id: str, dacl: str | None = None,
+                              description: str | None = None) -> str:
+        """Update a downloadable ACL's content/description (ERS)."""
+        return dumps(await client.ers_update(
+            _ERS_DACL, dacl_id, "DownloadableAcl",
+            {"dacl": dacl, "description": description}))
 
     @mcp.tool()
     async def ise_delete_dacl(dacl_id: str) -> str:
@@ -188,6 +207,12 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
                                           json_body=json.loads(body)))
 
     @mcp.tool()
+    async def ise_update_policy_set_raw(policy_id: str, body: str) -> str:
+        """Update a policy set from a full JSON body (OpenAPI PUT)."""
+        return dumps(await client.openapi(
+            "PUT", f"{_NA}/policy-set/{policy_id}", json_body=json.loads(body)))
+
+    @mcp.tool()
     async def ise_delete_policy_set(policy_id: str) -> str:
         """Delete a policy set by id (OpenAPI)."""
         return dumps(await client.openapi("DELETE", f"{_NA}/policy-set/{policy_id}"))
@@ -224,6 +249,13 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         """Create an authorization rule from a full JSON body (OpenAPI)."""
         return dumps(await client.openapi(
             "POST", f"{_NA}/policy-set/{policy_id}/authorization",
+            json_body=json.loads(body)))
+
+    @mcp.tool()
+    async def ise_update_authz_rule_raw(policy_id: str, rule_id: str, body: str) -> str:
+        """Update an authorization rule from a full JSON body (OpenAPI PUT)."""
+        return dumps(await client.openapi(
+            "PUT", f"{_NA}/policy-set/{policy_id}/authorization/{rule_id}",
             json_body=json.loads(body)))
 
     @mcp.tool()

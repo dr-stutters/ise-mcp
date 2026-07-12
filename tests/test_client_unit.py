@@ -7,6 +7,7 @@ anywhere (CI included). Run: `uv run pytest`.
 from __future__ import annotations
 
 import asyncio
+import json
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -198,6 +199,26 @@ def test_ers_list_all_paginates():
         return httpx.Response(200, json={"SearchResult": {"resources": [{"id": "2"}]}})
     out = run(_client(handler).ers_list_all("/ers/config/sgt"))
     assert [r["id"] for r in out] == ["1", "2"]
+
+
+# --------------------------------------------------------------------------
+# ers_update: GET -> merge non-None changes -> PUT full object
+# --------------------------------------------------------------------------
+def test_ers_update_merges_and_puts():
+    captured = {}
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"Sgt": {
+                "id": "x", "name": "Old", "value": 10, "description": "d"}})
+        captured["put"] = json.loads(req.content)
+        return httpx.Response(200, json={"UpdatedFieldsList": {}})
+
+    run(_client(handler).ers_update("/ers/config/sgt", "x", "Sgt",
+                                    {"name": "New", "description": None}))
+    # name changed, description (None) left as-is, other fields preserved
+    assert captured["put"] == {"Sgt": {"id": "x", "name": "New",
+                                       "value": 10, "description": "d"}}
 
 
 # --------------------------------------------------------------------------

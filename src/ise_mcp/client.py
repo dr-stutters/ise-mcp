@@ -180,6 +180,15 @@ class ISEClient:
         return await self._request(method, url, headers=headers, json_body=json_body,
                                    params=params, follow_redirects=False)
 
+    async def ers_update(self, path: str, obj_id: str, wrapper: str,
+                         changes: dict) -> Any:
+        """Partial-update an ERS object: GET it, merge non-None changes into the
+        `wrapper` body, then PUT it back (ERS PUT wants the full object)."""
+        current = await self.ers("GET", f"{path}/{obj_id}")
+        obj = dict((current or {}).get(wrapper, {}))
+        obj.update({k: v for k, v in changes.items() if v is not None})
+        return await self.ers("PUT", f"{path}/{obj_id}", json_body={wrapper: obj})
+
     async def ers_list_all(self, path: str, params=None) -> list[dict]:
         """Follow ERS SearchResult paging and return all resources."""
         params = dict(params or {})

@@ -61,6 +61,23 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
             "POST", "/api/v1/endpoint", json_body=json.loads(body)))
 
     @mcp.tool()
+    async def ise_update_endpoint(value: str, group_id: str | None = None,
+                                  description: str | None = None) -> str:
+        """Update an endpoint by id/MAC (OpenAPI). Only given fields change.
+
+        Commonly used to move an endpoint into an endpoint identity group
+        (group_id) for MAB.
+        """
+        current = await client.openapi("GET", f"/api/v1/endpoint/{value}")
+        obj = dict(current.get("response", current) if isinstance(current, dict) else {})
+        if group_id is not None:
+            obj["groupId"] = group_id
+        if description is not None:
+            obj["description"] = description
+        return dumps(await client.openapi(
+            "PUT", f"/api/v1/endpoint/{obj.get('id', value)}", json_body=obj))
+
+    @mcp.tool()
     async def ise_delete_endpoint(value: str) -> str:
         """Delete an endpoint by id (UUID) or MAC address."""
         return dumps(await client.openapi("DELETE", f"/api/v1/endpoint/{value}"))

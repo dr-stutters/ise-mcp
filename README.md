@@ -42,12 +42,14 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (108)
+## Dedicated tools (117)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
 endpoint groups, policy set + authZ rule) are verified end-to-end against live
-ISE 3.4 and 3.5.
+ISE 3.4 and 3.5. Most objects also support **update (PUT)** (partial edits via a
+GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
+`filter`.
 
 - **system / deployment** — `ise_version`, `ise_check_surfaces`,
   `ise_deployment_nodes`, `ise_get_node`
@@ -107,7 +109,7 @@ uv run python tests/integration_test.py         # full read-only suite (live)
 uv run python tests/integration_test.py --write # + create/verify/delete round-trips
 ```
 
-- **`tests/test_client_unit.py`** — 21 ISE-free unit tests (httpx `MockTransport`):
+- **`tests/test_client_unit.py`** — 22 ISE-free unit tests (httpx `MockTransport`):
   XML→dict parsing, ERS `Location`-id extraction, the "ERS not enabled" `/admin/`
   redirect, error-message extraction, content-type dispatch, CSRF fetch+retry,
   transport-error wrapping + retry, `ers_list_all` paging, config loading, and

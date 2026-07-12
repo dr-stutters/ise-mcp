@@ -20,9 +20,15 @@ _ND = "/ers/config/networkdevice"
 
 def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     @mcp.tool()
-    async def ise_list_network_devices() -> str:
-        """List all network devices (NADs / RADIUS clients). ERS, follows paging."""
-        return dumps(await client.ers_list_all(_ND))
+    async def ise_list_network_devices(filter: str | None = None) -> str:
+        """List network devices (NADs / RADIUS clients). ERS, follows paging.
+
+        Args:
+            filter: optional ERS filter, e.g. 'name.CONTAINS.core' or
+                'ipaddress.EQ.10.0.0.1'.
+        """
+        params = {"filter": filter} if filter else None
+        return dumps(await client.ers_list_all(_ND, params=params))
 
     @mcp.tool()
     async def ise_get_network_device(device_id: str) -> str:
@@ -68,6 +74,16 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_create_network_device_raw(body: str) -> str:
         """Create a NAD from a full ERS JSON body ({'NetworkDevice': {...}})."""
         return dumps(await client.ers("POST", _ND, json_body=json.loads(body)))
+
+    @mcp.tool()
+    async def ise_update_network_device(device_id: str, name: str | None = None,
+                                        description: str | None = None) -> str:
+        """Update a network device's name/description (ERS; only given fields change).
+
+        For deeper edits (IP list, shared secret) use ise_ers_call with a PUT.
+        """
+        return dumps(await client.ers_update(
+            _ND, device_id, "NetworkDevice", {"name": name, "description": description}))
 
     @mcp.tool()
     async def ise_delete_network_device(device_id: str) -> str:

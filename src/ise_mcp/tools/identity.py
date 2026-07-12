@@ -19,9 +19,15 @@ _USER = "/ers/config/internaluser"
 
 def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     @mcp.tool()
-    async def ise_list_internal_users() -> str:
-        """List internal users (ERS, follows paging)."""
-        return dumps(await client.ers_list_all(_USER))
+    async def ise_list_internal_users(filter: str | None = None) -> str:
+        """List internal users (ERS, follows paging).
+
+        Args:
+            filter: optional ERS filter, e.g. 'name.CONTAINS.svc' or
+                'enabled.EQ.true'.
+        """
+        params = {"filter": filter} if filter else None
+        return dumps(await client.ers_list_all(_USER, params=params))
 
     @mcp.tool()
     async def ise_get_internal_user(user_id: str) -> str:
@@ -62,6 +68,27 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_create_internal_user_raw(body: str) -> str:
         """Create an internal user from a full ERS JSON body ({'InternalUser': {...}})."""
         return dumps(await client.ers("POST", _USER, json_body=json.loads(body)))
+
+    @mcp.tool()
+    async def ise_update_internal_user(user_id: str, password: str | None = None,
+                                       enabled: bool | None = None,
+                                       email: str | None = None,
+                                       description: str | None = None) -> str:
+        """Update an internal user (ERS; only given fields change).
+
+        The GET returns a masked password ('*******'); echoing it back on the PUT
+        is rejected, so it is stripped and only re-set when a new `password` is
+        supplied.
+        """
+        current = await client.ers("GET", f"{_USER}/{user_id}")
+        obj = dict((current or {}).get("InternalUser", {}))
+        obj.pop("password", None)  # never echo the masked password back
+        for key, val in (("password", password), ("enabled", enabled),
+                         ("email", email), ("description", description)):
+            if val is not None:
+                obj[key] = val
+        return dumps(await client.ers("PUT", f"{_USER}/{user_id}",
+                                      json_body={"InternalUser": obj}))
 
     @mcp.tool()
     async def ise_delete_internal_user(user_id: str) -> str:

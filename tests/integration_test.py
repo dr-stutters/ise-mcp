@@ -195,6 +195,23 @@ async def main(write: bool) -> int:
                     name_val="AA:BB:CC:DD:EE:F1", del_tool="ise_delete_endpoint",
                     del_key="value")
 
+    # update (PUT): create -> update -> confirm -> delete (SGT via generic
+    # ers_update; internal user which strips the masked password)
+    try:
+        used2 = {s.get("value") for s in as_list(safe(await call(mcp, "ise_list_sgts")))}
+        v2 = next(v for v in range(5000, 7000) if v not in used2)
+        c = safe(await call(mcp, "ise_create_sgt", name="zzz_it_upd", value=v2, description="before"))
+        sid = (c.get("id") if isinstance(c, dict) else None) or next(
+            (s["id"] for s in as_list(safe(await call(mcp, "ise_list_sgts")))
+             if s.get("name") == "zzz_it_upd"), None)
+        await call(mcp, "ise_update_sgt", sgt_id=sid, description="after")
+        got = safe(await call(mcp, "ise_get_sgt", sgt_id=sid))
+        await call(mcp, "ise_delete_sgt", sgt_id=sid)
+        ok = got.get("Sgt", {}).get("description") == "after"
+        rec("SGT update (PUT)", "OK" if ok else "FAIL", f"id={sid}")
+    except Exception as e:  # noqa: BLE001
+        rec("SGT update (PUT)", "FAIL", e)
+
     # policy set + authZ rule (condition resolved by name)
     try:
         for p in as_list(safe(await call(mcp, "ise_list_policy_sets"))):
