@@ -39,13 +39,20 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_create_endpoint(mac: str, name: str | None = None,
                                   group_id: str | None = None,
                                   description: str | None = None) -> str:
-        """Register an endpoint by MAC. Optionally assign an endpoint identity group."""
+        """Register an endpoint by MAC. Optionally assign an endpoint identity group.
+
+        Returns the created endpoint (incl. its id). The POST itself returns an
+        empty 201, so the new record is fetched back by MAC.
+        """
         body: dict = {"mac": mac, "name": name or mac}
         if group_id:
             body["groupId"] = group_id
         if description:
             body["description"] = description
-        return dumps(await client.openapi("POST", "/api/v1/endpoint", json_body=body))
+        result = await client.openapi("POST", "/api/v1/endpoint", json_body=body)
+        if not result:  # empty 201 - fetch the created record so the id comes back
+            result = await client.openapi("GET", f"/api/v1/endpoint/{mac}")
+        return dumps(result)
 
     @mcp.tool()
     async def ise_create_endpoint_raw(body: str) -> str:

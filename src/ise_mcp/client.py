@@ -103,6 +103,11 @@ class ISEClient:
         if raw_text:
             return resp.text
         if resp.status_code == 204 or not resp.content:
+            # ERS creates return 201 with an empty body and a Location header
+            # pointing at the new resource - surface the new id.
+            loc = resp.headers.get("Location") or resp.headers.get("location")
+            if loc:
+                return {"created": True, "id": loc.rstrip("/").split("/")[-1], "location": loc}
             return None
         ctype = resp.headers.get("content-type", "")
         if "json" in ctype:
