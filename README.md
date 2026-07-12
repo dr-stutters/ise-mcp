@@ -17,13 +17,16 @@ plus dedicated tools:
 | Surface | Port / base | Covers | Tools |
 |---|---|---|---|
 | **OpenAPI** | `443` `/api/…` | endpoints, TrustSec (SGT/SGACL/egress), policy sets, deployment/nodes | dedicated + `ise_openapi_call` |
-| **ERS** | `9060` `/ers/config/…` | network devices (NADs), internal users, identity/endpoint groups | dedicated + `ise_ers_call` |
+| **ERS** | `443` `/ers/config/…` | network devices (NADs), internal users, identity/endpoint groups | dedicated + `ise_ers_call` |
 | **MnT** | `443` `/admin/API/mnt/…` | read-only session monitoring, version, failure reasons (XML→dict) | dedicated + `ise_mnt_call` |
 
-> **ERS reachability:** ERS must be enabled (Admin → System → Settings → API
-> Settings) **and** TCP 9060 reachable. Some deployments (e.g. dCloud) firewall
-> 9060 — those tools then time out. Call **`ise_check_surfaces`** first to see
-> what actually answers; the OpenAPI surface covers most config on such boxes.
+> **Enabling ERS:** ERS is **disabled by default**. Turn it on in the ISE GUI:
+> *Administration → System → Settings → API Settings → API Service Settings →*
+> **ERS (Read/Write)**. Until then ISE redirects ERS calls to `/admin/` and the
+> ERS tools report "ERS not enabled". ERS is served on **port 443** (modern,
+> ISE 3.1+); the legacy **9060** port also serves ERS but is deprecated and often
+> off/firewalled — set `ISE_ERS_PORT=9060` only for older ISE. Call
+> **`ise_check_surfaces`** first to see what actually answers.
 
 ## The OpenAPI surface is schema-driven
 
@@ -61,7 +64,7 @@ Copy `.env.example` to `.env` (gitignored) and set:
 ISE_URL=https://198.18.129.30      # ISE admin/PAN node
 ISE_USERNAME=admin
 ISE_PASSWORD=C1sco12345
-ISE_ERS_PORT=9060                  # ERS surface port
+ISE_ERS_PORT=443                   # ERS port: 443 (modern) or legacy 9060
 ISE_VERIFY_SSL=false               # lab certs are self-signed
 ISE_TIMEOUT=60                     # seconds
 ```
@@ -75,9 +78,9 @@ uv run ise-mcp                     # stdio transport (for MCP clients)
 uv run python tests/smoke_test.py  # read-only smoke test against the live ISE
 ```
 
-The smoke test is verified against **ISE 3.4.0.608** and **ISE 3.5.0.527** —
-OpenAPI + MnT tools pass on both; ERS is reported as skipped where 9060 is
-firewalled.
+The smoke test is verified against **ISE 3.4.0.608** and **ISE 3.5.0.527** — all
+three surfaces (OpenAPI, MnT, ERS-over-443) pass once ERS is enabled in API
+Settings; where ERS is still disabled the ERS check is reported as skipped.
 
 ## Roadmap
 

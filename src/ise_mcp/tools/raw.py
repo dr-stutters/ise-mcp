@@ -37,12 +37,14 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         query_params: dict[str, Any] | None = None,
         body: str | None = None,
     ) -> str:
-        """Call any ISE ERS endpoint (port 9060, /ers/config/...).
+        """Call any ISE ERS endpoint (/ers/config/...), over port 443 by default.
 
-        ERS must be enabled (Admin > System > Settings > API Settings) AND port
-        9060 reachable - some deployments (e.g. dCloud) firewall it, in which case
-        this times out; use the OpenAPI surface there. Example path:
-        '/ers/config/networkdevice', '/ers/config/internaluser'.
+        ERS must be enabled (Admin > System > Settings > API Settings > API
+        Service Settings > ERS Read/Write); until then ISE redirects to /admin/
+        and this reports "ERS not enabled". ERS is served on 443 (modern) and the
+        legacy 9060 (deprecated in ISE 3.x, often off/firewalled - set
+        ISE_ERS_PORT=9060 to force it). Example path: '/ers/config/networkdevice',
+        '/ers/config/internaluser'.
         """
         return dumps(await client.ers(
             method, path, params=query_params,

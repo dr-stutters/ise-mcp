@@ -19,9 +19,9 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_check_surfaces() -> str:
         """Probe which ISE API surfaces are reachable from here (OpenAPI / MnT / ERS).
 
-        Handy first call: ERS (port 9060) is firewalled off in some deployments
-        (e.g. dCloud); this reports what actually works so you know which tools
-        will function.
+        Handy first call: ERS (over 443) requires the ERS API service to be
+        enabled in API Settings - until then ISE redirects to /admin/ and ERS
+        tools won't work. This reports what actually answers.
         """
         out = {}
         try:
@@ -38,5 +38,5 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
             await client.ers("GET", "/ers/config/networkdevice", params={"size": 1})
             out["ers"] = "reachable"
         except Exception as e:
-            out["ers"] = f"unreachable (port 9060 blocked or ERS off): {str(e)[:60]}"
+            out["ers"] = f"unreachable (ERS API service off or blocked): {str(e)[:90]}"
         return dumps(out)

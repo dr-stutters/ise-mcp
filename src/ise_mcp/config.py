@@ -44,7 +44,9 @@ def load_settings() -> Settings:
     if not username or not password:
         raise RuntimeError("ISE_USERNAME and ISE_PASSWORD must be set.")
 
-    ers_port = int(os.environ.get("ISE_ERS_PORT", "9060"))
+    # ERS is served on both 443 (modern, recommended) and the legacy 9060.
+    # Default to 443: 9060 is deprecated (ISE 3.x) and often firewalled/off.
+    ers_port = int(os.environ.get("ISE_ERS_PORT", "443"))
     verify = os.environ.get("ISE_VERIFY_SSL", "false").strip().lower() in ("1", "true", "yes")
     timeout = float(os.environ.get("ISE_TIMEOUT", "60"))
 

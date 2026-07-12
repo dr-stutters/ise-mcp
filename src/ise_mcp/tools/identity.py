@@ -1,7 +1,7 @@
 """Identity tools: internal users + identity/endpoint groups.
 
-ERS surface (port 9060, best-effort - see network_devices.py). Internal users
-and identity groups have no OpenAPI equivalent in ISE 3.4/3.5.
+ERS surface (over port 443 by default; legacy 9060 - see network_devices.py).
+Internal users and identity groups have no OpenAPI equivalent in ISE 3.4/3.5.
 """
 
 from __future__ import annotations

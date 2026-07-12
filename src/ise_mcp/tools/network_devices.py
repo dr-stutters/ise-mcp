@@ -1,8 +1,8 @@
 """Network device (NAD / RADIUS client) tools.
 
-ERS surface (port 9060). ERS must be enabled and 9060 reachable; some
-deployments (dCloud) firewall 9060 - these tools then time out. There is no
-OpenAPI equivalent for NADs in ISE 3.4/3.5, so this is ERS-only.
+ERS surface (over port 443 by default; legacy 9060). ERS must be enabled in API
+Settings, else ISE redirects to /admin/ and these report "ERS not enabled".
+There is no OpenAPI equivalent for NADs in ISE 3.4/3.5, so this is ERS-only.
 """
 
 from __future__ import annotations

@@ -4,9 +4,9 @@ Read-only by default. Requires a .env (ISE_URL/ISE_USERNAME/ISE_PASSWORD)
 pointing at a reachable ISE. Run: `uv run python tests/smoke_test.py`
 
 Verified against ISE 3.4.0.608 (198.18.129.30) and ISE 3.5.0.527
-(198.18.134.35). The OpenAPI + MnT tools work on both; ERS (port 9060) is
-firewalled off in those deployments, so ERS tools are reported as skipped
-rather than failing the run.
+(198.18.134.35). All three surfaces (OpenAPI, MnT, ERS-over-443) pass once ERS
+is enabled in API Settings; where ERS is still disabled ISE redirects to /admin/
+and the ERS check is reported as skipped rather than failing the run.
 """
 
 from __future__ import annotations
@@ -75,14 +75,16 @@ async def main() -> None:
     assert search.get("paths"), "spec search returned no paths"
     print(f"[ok] ise_search_spec('security-groups') -> {len(search['paths'])} paths")
 
-    # --- ERS surface (9060) - best-effort (firewalled in some deployments) ---
+    # --- ERS surface (443) - best-effort (needs ERS enabled in API Settings) ---
     try:
         raw = await call(mcp, "ise_list_network_devices")
         ers = json.loads(raw)
         n = ers if isinstance(ers, list) else ers.get("SearchResult", {}).get("resources", ers)
         print(f"[ok] ise_list_network_devices -> {len(n) if isinstance(n, list) else ers}")
+        idg = json.loads(await call(mcp, "ise_list_identity_groups"))
+        print(f"[ok] ise_list_identity_groups -> {len(idg) if isinstance(idg, list) else '?'} groups")
     except Exception as e:
-        print(f"[skip] ise_list_network_devices -> ERS unreachable (port 9060): {str(e)[:80]}")
+        print(f"[skip] ise ERS -> not enabled (Admin > System > Settings > API Settings): {str(e)[:70]}")
 
     print("\nSMOKE TEST PASSED")
 

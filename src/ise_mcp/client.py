@@ -2,7 +2,10 @@
 
 ISE spreads its APIs across three surfaces, all HTTP Basic auth:
   - OpenAPI : https://<ise>/api/...            (port 443, JSON; ISE 3.x)
-  - ERS     : https://<ise>:9060/ers/config/... (port 9060, JSON; must be enabled+reachable)
+  - ERS     : https://<ise>/ers/config/...     (port 443 by default; ERS must be
+              enabled in API Settings. Legacy port 9060 also serves ERS but is
+              deprecated in ISE 3.x and often firewalled - override ISE_ERS_PORT
+              to use it.)
   - MnT     : https://<ise>/admin/API/mnt/...   (port 443, returns XML)
 
 There is no token dance (unlike FMC) - Basic auth on every call. OpenAPI writes
@@ -68,10 +71,21 @@ class ISEClient:
     # Low-level request with ISE error extraction
     # ------------------------------------------------------------------
     async def _request(self, method: str, url: str, *, headers=None, json_body=None,
-                       params=None, raw_text=False) -> Any:
+                       params=None, raw_text=False, follow_redirects=None) -> Any:
         if params:
             params = {k: v for k, v in params.items() if v is not None}
-        resp = await self._http.request(method, url, headers=headers, json=json_body, params=params or None)
+        kwargs: dict[str, Any] = {}
+        if follow_redirects is not None:
+            kwargs["follow_redirects"] = follow_redirects
+        resp = await self._http.request(method, url, headers=headers, json=json_body,
+                                        params=params or None, **kwargs)
+        # ERS bounces to /admin/ when the ERS API service is disabled.
+        if resp.is_redirect and "/admin" in (resp.headers.get("location") or ""):
+            raise ISEAPIError(
+                resp.status_code, method.upper(), url,
+                "redirected to /admin/ - the ERS API service is not enabled. "
+                "Enable it in the ISE GUI: Administration > System > Settings > "
+                "API Settings > API Service Settings > ERS (Read/Write).")
         if resp.status_code >= 400:
             detail = resp.text[:1500]
             try:
@@ -123,14 +137,15 @@ class ISEClient:
         self._csrf = resp.headers.get("X-CSRF-Token")
 
     # ------------------------------------------------------------------
-    # ERS surface (port 9060, /ers/config/...)
+    # ERS surface (port 443 by default; /ers/config/...). Legacy: port 9060.
     # ------------------------------------------------------------------
     async def ers(self, method: str, path: str, *, json_body=None, params=None) -> Any:
         if not path.startswith("/"):
             path = "/" + path
         url = f"{self._ers_base}{path}"
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
-        return await self._request(method, url, headers=headers, json_body=json_body, params=params)
+        return await self._request(method, url, headers=headers, json_body=json_body,
+                                   params=params, follow_redirects=False)
 
     async def ers_list_all(self, path: str, params=None) -> list[dict]:
         """Follow ERS SearchResult paging and return all resources."""
