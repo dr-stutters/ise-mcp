@@ -95,12 +95,31 @@ Point `ISE_URL` at any ISE PAN; one server instance targets one deployment.
 
 ```bash
 uv run ise-mcp                     # stdio transport (for MCP clients)
-uv run python tests/smoke_test.py  # read-only smoke test against the live ISE
 ```
 
-The smoke test is verified against **ISE 3.4.0.608** and **ISE 3.5.0.527** — all
-three surfaces (OpenAPI, MnT, ERS-over-443) pass once ERS is enabled in API
-Settings; where ERS is still disabled the ERS check is reported as skipped.
+## Tests
+
+```bash
+uv run pytest                                   # unit tests - no ISE needed
+uv run python tests/smoke_test.py               # quick read-only live check
+uv run python tests/integration_test.py         # full read-only suite (live)
+uv run python tests/integration_test.py --write # + create/verify/delete round-trips
+```
+
+- **`tests/test_client_unit.py`** — 18 ISE-free unit tests (httpx `MockTransport`):
+  XML→dict parsing, ERS `Location`-id extraction, the "ERS not enabled" `/admin/`
+  redirect, error-message extraction, content-type dispatch, CSRF fetch+retry,
+  `ers_list_all` paging, config loading, and spec search/get-definition. Runs
+  anywhere, including CI.
+- **`tests/integration_test.py`** — drives every tool through the MCP layer against
+  a live ISE. Read-only by default (safe anytime); `--write` adds
+  create→verify→delete round-trips for all writable resources (NAD, SGT, SGACL,
+  dACL, authZ profile, groups, internal user, endpoint, policy set + rule, trusted
+  cert). Version/feature-gated tools (RBAC on 3.4, sponsor-gated guest users) are
+  reported as skips, not failures.
+
+Verified against **ISE 3.4.0.608** and **ISE 3.5.0.527** — all three surfaces
+(OpenAPI, MnT, ERS-over-443) pass once ERS is enabled in API Settings.
 
 ## Roadmap
 
@@ -108,4 +127,5 @@ Settings; where ERS is still disabled the ERS check is reported as skipped.
   client certificate enrollment + approval) rather than Basic-auth REST, so it's
   a separate build: session/topic subscription, ANC (Adaptive Network Control)
   quarantine actions, and bulk session download. Not in v1.
-- Deeper policy-set authoring (rule create/update) and guest/sponsor flows.
+- Guest-user provisioning via a sponsor account (guest *users* are sponsor-gated;
+  guest types / sponsor portals & groups are already covered).
