@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ise": {
+      "command": "uv",
+      "args": ["run", "ise-mcp"]
+    }
+  }
+}
