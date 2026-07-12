@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (69)
+## Dedicated tools (85)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -57,8 +57,13 @@ ISE 3.4 and 3.5.
 - **policy (read)** — policy sets, authN/authZ rules, conditions
 - **policy authoring** — authorization profiles (create with VLAN/dACL), downloadable
   ACLs, policy sets + authZ rules (condition resolved by name, e.g. `Wired_802.1X`)
-- **sessions (MnT)** — active session count/list, session by MAC/IP (clean
-  "no active session" when idle), failure reasons
+- **sessions / monitoring (MnT)** — active session count/list, session by
+  MAC/IP/username (clean "no active session" when idle), session counts summary,
+  `ise_auth_status_by_mac` (recent auth attempts + pass/fail), failure reasons
+- **operations (day-2)** — repositories, last-backup status, installed patches,
+  smart-licensing status, node groups, and `ise_system_summary` (one-call
+  version/nodes/license/patch/backup/sessions dashboard)
+- **certificates** — system & trusted certificate inventory, pending CSRs
 - **network_devices (ERS)** — onboard/list/get/delete NADs + device groups (CRUD)
 - **identity (ERS)** — internal users (create/list/get/delete, group name→id
   resolved), identity & endpoint groups (create/list/delete)

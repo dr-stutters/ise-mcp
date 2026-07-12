@@ -35,6 +35,8 @@ _TOOL_MODULES = (
     "trustsec",
     "policy",
     "sessions",
+    "operations",
+    "certificates",
     "network_devices",
     "identity",
     "raw",
