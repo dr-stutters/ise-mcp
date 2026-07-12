@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 import httpx
 import pytest
 
-from ise_mcp.client import ISEClient, ISEAPIError, _xml_to_dict
+from ise_mcp.client import ISEAPIError, ISEClient, ISEConnectionError, _xml_to_dict
 from ise_mcp.config import Settings, load_settings
 from ise_mcp.spec import SpecCache
 
@@ -21,13 +21,14 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def _settings(ers_port: int = 443) -> Settings:
+def _settings(ers_port: int = 443, retries: int = 2) -> Settings:
     return Settings(base_url="https://ise.example.com", username="admin",
-                    password="pw", ers_port=ers_port, verify_ssl=False, timeout=5)
+                    password="pw", ers_port=ers_port, verify_ssl=False,
+                    timeout=5, retries=retries)
 
 
-def _client(handler, ers_port: int = 443) -> ISEClient:
-    c = ISEClient(_settings(ers_port))
+def _client(handler, ers_port: int = 443, retries: int = 2) -> ISEClient:
+    c = ISEClient(_settings(ers_port, retries))
     c._http = httpx.AsyncClient(
         transport=httpx.MockTransport(handler),
         auth=httpx.BasicAuth("admin", "pw"), follow_redirects=True)
@@ -142,6 +143,47 @@ def test_csrf_fetch_and_retry_on_403():
 
     r = run(_client(handler).openapi("POST", "/api/v1/endpoint", json_body={}))
     assert r == {"ok": True} and state["posts"] == 2
+
+
+# --------------------------------------------------------------------------
+# transport-error wrapping + retry
+# --------------------------------------------------------------------------
+def test_transport_error_wrapped_as_connection_error():
+    calls = {"n": 0}
+
+    def handler(_req):
+        calls["n"] += 1
+        raise httpx.ConnectError("connection refused")
+
+    with pytest.raises(ISEConnectionError) as ei:
+        run(_client(handler, retries=0).openapi("GET", "/api/v1/x"))
+    assert ei.value.status_code == 0 and "ConnectError" in str(ei.value)
+    assert calls["n"] == 1
+
+
+def test_transient_transport_error_is_retried():
+    calls = {"n": 0}
+
+    def handler(_req):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.ConnectError("transient")
+        return httpx.Response(200, json={"ok": True})
+
+    assert run(_client(handler, retries=2).openapi("GET", "/api/v1/x")) == {"ok": True}
+    assert calls["n"] == 2
+
+
+def test_protocol_error_is_not_retried():
+    calls = {"n": 0}
+
+    def handler(_req):
+        calls["n"] += 1
+        raise httpx.RemoteProtocolError("illegal header line")
+
+    with pytest.raises(ISEConnectionError):
+        run(_client(handler, retries=2).openapi("GET", "/api/v1/x"))
+    assert calls["n"] == 1
 
 
 # --------------------------------------------------------------------------

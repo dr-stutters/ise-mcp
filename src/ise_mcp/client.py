@@ -15,6 +15,7 @@ lazily and retries. MnT XML is parsed to a dict.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 from urllib.parse import urlsplit
@@ -29,6 +30,14 @@ class ISEAPIError(Exception):
     def __init__(self, status_code: int, method: str, url: str, detail: str):
         self.status_code = status_code
         super().__init__(f"ISE API error {status_code} on {method} {url}: {detail}")
+
+
+class ISEConnectionError(ISEAPIError):
+    """ISE was unreachable / the response was unparseable at the transport layer
+    (timeout, connection refused/reset, malformed HTTP). status_code is 0."""
+
+    def __init__(self, method: str, url: str, detail: str):
+        super().__init__(0, method, url, detail)
 
 
 def _xml_to_dict(elem: ET.Element) -> Any:
@@ -67,6 +76,26 @@ class ISEClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
+    async def _send(self, method, url, headers, json_body, params, kwargs) -> httpx.Response:
+        """Issue the request, retrying transient transport failures and wrapping
+        any httpx transport error in a clean ISEConnectionError."""
+        attempts = max(1, self.settings.retries + 1)
+        for attempt in range(attempts):
+            try:
+                return await self._http.request(
+                    method, url, headers=headers, json=json_body,
+                    params=params or None, **kwargs)
+            except httpx.TransportError as e:
+                # Retry connect/read/pool timeouts + network errors, but not a
+                # malformed-response protocol error (retrying won't help).
+                retryable = not isinstance(e, httpx.ProtocolError)
+                if retryable and attempt < attempts - 1:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                raise ISEConnectionError(
+                    method.upper(), url,
+                    f"{type(e).__name__}: {e or 'unreachable'}") from e
+
     # ------------------------------------------------------------------
     # Low-level request with ISE error extraction
     # ------------------------------------------------------------------
@@ -77,8 +106,7 @@ class ISEClient:
         kwargs: dict[str, Any] = {}
         if follow_redirects is not None:
             kwargs["follow_redirects"] = follow_redirects
-        resp = await self._http.request(method, url, headers=headers, json=json_body,
-                                        params=params or None, **kwargs)
+        resp = await self._send(method, url, headers, json_body, params, kwargs)
         # ERS bounces to /admin/ when the ERS API service is disabled.
         if resp.is_redirect and "/admin" in (resp.headers.get("location") or ""):
             raise ISEAPIError(

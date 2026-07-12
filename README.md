@@ -87,6 +87,7 @@ ISE_PASSWORD=C1sco12345
 ISE_ERS_PORT=443                   # ERS port: 443 (modern) or legacy 9060
 ISE_VERIFY_SSL=false               # lab certs are self-signed
 ISE_TIMEOUT=60                     # seconds
+ISE_RETRIES=2                      # retries on transient transport failures
 ```
 
 Point `ISE_URL` at any ISE PAN; one server instance targets one deployment.
@@ -106,11 +107,12 @@ uv run python tests/integration_test.py         # full read-only suite (live)
 uv run python tests/integration_test.py --write # + create/verify/delete round-trips
 ```
 
-- **`tests/test_client_unit.py`** — 18 ISE-free unit tests (httpx `MockTransport`):
+- **`tests/test_client_unit.py`** — 21 ISE-free unit tests (httpx `MockTransport`):
   XML→dict parsing, ERS `Location`-id extraction, the "ERS not enabled" `/admin/`
   redirect, error-message extraction, content-type dispatch, CSRF fetch+retry,
-  `ers_list_all` paging, config loading, and spec search/get-definition. Runs
-  anywhere, including CI.
+  transport-error wrapping + retry, `ers_list_all` paging, config loading, and
+  spec search/get-definition. Runs anywhere — `ruff` + these run in CI on every
+  push ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 - **`tests/integration_test.py`** — drives every tool through the MCP layer against
   a live ISE. Read-only by default (safe anytime); `--write` adds
   create→verify→delete round-trips for all writable resources (NAD, SGT, SGACL,

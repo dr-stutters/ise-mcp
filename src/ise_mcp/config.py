@@ -17,6 +17,7 @@ class Settings:
     ers_port: int
     verify_ssl: bool
     timeout: float
+    retries: int = 2
 
 
 def load_settings() -> Settings:
@@ -49,6 +50,7 @@ def load_settings() -> Settings:
     ers_port = int(os.environ.get("ISE_ERS_PORT", "443"))
     verify = os.environ.get("ISE_VERIFY_SSL", "false").strip().lower() in ("1", "true", "yes")
     timeout = float(os.environ.get("ISE_TIMEOUT", "60"))
+    retries = int(os.environ.get("ISE_RETRIES", "2"))
 
     return Settings(
         base_url=host,
@@ -57,4 +59,5 @@ def load_settings() -> Settings:
         ers_port=ers_port,
         verify_ssl=verify,
         timeout=timeout,
+        retries=retries,
     )
