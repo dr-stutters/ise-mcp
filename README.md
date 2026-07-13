@@ -136,6 +136,15 @@ RADIUS must source from a **front-panel global-table interface**, not the OOB
 Mgmt-vrf port (IOSd RADIUS works over Mgmt-vrf and masks the problem); the
 lightweight L2 sims (iosvl2, ioll2-xe) can't do MAB at all.
 
+**AD-integrated 802.1X is validated too:** ISE 3.5 joined to a Windows AD domain
+(ERS `activedirectory` create + `joinAllNodes`), then **PEAP-MSCHAPv2** authenticating
+a domain user end-to-end from a wpa_supplicant client through the cat9000v to ISE →
+AD (authN rule pointed at the AD join point, `Wired_802.1X` → `PermitAccess`), with
+the passed auth visible in MnT. The EAP-TLS PKI chain is in place too: CA cert →
+`ise_import_trusted_cert` (client-auth trust), and ISE CSR → CA-signed → bound as the
+EAP identity cert. ERS join gotchas: use `/joinAllNodes` (not `/join`, which wants a
+node target) with `username`+`password` only — `domainName` is rejected.
+
 ## Roadmap
 
 - **pxGrid (phase 2)** — pxGrid is a cert-based pub/sub surface (WebSocket/STOMP,
