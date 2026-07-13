@@ -81,7 +81,14 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
 - **raw / spec** — `ise_openapi_call`, `ise_ers_call`, `ise_mnt_call`,
   `ise_openapi_groups`, `ise_search_spec`, `ise_get_definition`
 
-## Configuration
+## Install
+
+```bash
+git clone https://github.com/dr-stutters/ise-mcp
+cd ise-mcp && uv sync
+```
+
+## Configure
 
 Copy `.env.example` to `.env` (gitignored) and set:
 
@@ -97,13 +104,34 @@ ISE_RETRIES=2                      # retries on transient transport failures
 
 Point `ISE_URL` at any ISE PAN; one server instance targets one deployment.
 
-## Run
+## How to use this
 
-```bash
-uv run ise-mcp                     # stdio transport (for MCP clients)
+Run standalone (stdio): `uv run ise-mcp` — or register it in any MCP client:
+
+```json
+{ "mcpServers": { "ise": { "command": "uv",
+    "args": ["run", "--directory", "/path/to/ise-mcp", "ise-mcp"] } } }
 ```
 
-## Tests
+It's built to be driven by an AI agent. In the
+[cml-mcp](https://github.com/dr-stutters/cml-mcp) lab suite it's wired in as the
+`ise` server (plus an `ise35` instance pointed at a second deployment), owned by
+the **ise-engineer** agent (tool prefix `mcp__ise__*`) — identity/NAC work in lab
+requests fans out to it automatically, and the validated ISE NAC lab rebuilds
+from that repo's `Custom Designs/ISE NAC Lab/` runbook + topology spec.
+Standalone, just describe what you want:
+
+> "Onboard the switch at 198.18.128.66 as a NAD with RADIUS secret ISEsecret123."
+
+> "Create an authorization profile that assigns VLAN 100 and a dACL, and wire it
+> into the wired-MAB policy set."
+
+> "Who's authenticated right now, and why did aa:bb:cc:dd:ee:ff fail?"
+
+Call **`ise_check_surfaces`** first — it reports which of the three surfaces
+answer (and whether ERS is enabled) before anything else is attempted.
+
+## Test
 
 ```bash
 uv run pytest                                   # unit tests - no ISE needed
@@ -170,3 +198,10 @@ RADIUS source, and the ERS `trustsecsettings` schema misspells its fields
   quarantine actions, and bulk session download. Not in v1.
 - Guest-user provisioning via a sponsor account (guest *users* are sponsor-gated;
   guest types / sponsor portals & groups are already covered).
+
+## Security notes
+
+`.env` is gitignored — never commit credentials. Use a least-privilege ISE admin
+(e.g. a dedicated ERS-Admin account, which these tools can create). TLS
+verification is off by default for lab self-signed certs; set
+`ISE_VERIFY_SSL=true` against a trusted CA.
