@@ -150,6 +150,18 @@ node target) with `username`+`password` only — `domainName` is rejected; the
 identity-sequence resource is `/ers/config/idstoresequence` (wrapper
 `IdStoreSequence`, items `idSeqItem`).
 
+**Enforcement, TrustSec & CoA validated:** dynamic authZ pushes a downloadable ACL
+(`ise_create_dacl`) and a dynamic VLAN (`ise_create_authz_profile`) that the switch
+applies and enforces; **TrustSec** assigns an SGT as a rule result and enforces an
+SGACL (egress matrix `/ers/config/egressmatrixcell`) in the cat9000v hardware
+(HW-Denied counters); **CoA** re-authorizes a live session in place (MnT
+`/CoA/Reauth/{node}/{mac}/{reauthType}`, numeric reauthType) with no link bounce;
+and **full CTS** — with the NAD's `trustsecsettings` device-auth set — has the
+switch download the environment data + SGACL policy from ISE. Two quirks worth
+noting: the CoA `dynamic-author` client must live in the same VRF/table as the
+RADIUS source, and the ERS `trustsecsettings` schema misspells its fields
+(`downlaod…`).
+
 ## Roadmap
 
 - **pxGrid (phase 2)** — pxGrid is a cert-based pub/sub surface (WebSocket/STOMP,
