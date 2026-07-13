@@ -128,6 +128,14 @@ uv run python tests/integration_test.py --write # + create/verify/delete round-t
 Verified against **ISE 3.4.0.608** and **ISE 3.5.0.527** — all three surfaces
 (OpenAPI, MnT, ERS-over-443) pass once ERS is enabled in API Settings.
 
+**NAD-side NAC is validated too:** MAB (`Wired_MAB` → `PermitAccess`) authenticates
+end-to-end against both 3.4 and 3.5 from a Catalyst 9000v access switch (NAD
+onboarded + endpoint + authZ rule via these tools, auth confirmed on the switch and
+in MnT on the patched 3.5 node). Gotcha worth knowing: the cat9000v auth-manager
+RADIUS must source from a **front-panel global-table interface**, not the OOB
+Mgmt-vrf port (IOSd RADIUS works over Mgmt-vrf and masks the problem); the
+lightweight L2 sims (iosvl2, ioll2-xe) can't do MAB at all.
+
 ## Roadmap
 
 - **pxGrid (phase 2)** — pxGrid is a cert-based pub/sub surface (WebSocket/STOMP,
