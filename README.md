@@ -174,12 +174,17 @@ device-admin authZ rules take `commands` (a list of command-set names) + `profil
 (a shell-profile name) and **require** a rule condition (no catch-all); the
 `DEVICE:Device IP Address` attribute is illegal for the device-admin scope (use
 `Device Type`); TACACS *profile* names allow only alphanumeric/underscore/space (no
-hyphens). **Caveat:** ISE only answers TACACS+ on TCP 49 once the **Device Admin
-service** is enabled on the node. `ise_enable_device_admin` sends the correct
-`NodeUpdateRequest`, but a **standalone** ISE node rejects the persona change over
-the API (`Exception occurred while making REST call`) — enable it in the GUI
-(Administration ▸ System ▸ Deployment ▸ *node* ▸ **Enable Device Admin Service**).
-Once on, a NAD's `test aaa group <grp> <user> <pw> new-code` returns Access-Accept.
+hyphens). **Proven end-to-end** once the **Device Admin service** is enabled on the node
+(ISE only answers TACACS+ on TCP 49 with it on): `test aaa` authenticates both a
+priv-15 admin and a restricted operator; SSH logins show ISE driving the shell
+privilege (15 vs 1) *and* per-command authorization (AAA debug shows `service=shell
+priv-lvl=N` on exec + `AUTHOR/CMD PASS_ADD/FAIL` per command). Two field notes: (1)
+differentiate users by **identity group** in the rule condition — conditioning only
+on `DEVICE:Device Type` makes the rank-0 rule match everyone; (2) `ise_enable_device_admin`
+sends the correct `NodeUpdateRequest`, but a **standalone** ISE node rejects the
+persona change over the API (`Exception occurred while making REST call`) — enable it
+in the GUI (Administration ▸ System ▸ Deployment ▸ *node* ▸ **Enable Device Admin
+Service**).
 
 **Posture + guest — config-side validated:** posture conditions/requirements/policies
 and settings all read live on ISE 3.5; creates are raw-first (bodies are large and
