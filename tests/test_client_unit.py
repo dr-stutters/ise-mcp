@@ -273,3 +273,149 @@ def test_spec_get_definition_case_insensitive():
 def test_spec_get_definition_missing():
     d = run(_canned_spec_cache().get_definition("NoSuchSchema"))
     assert "error" in d
+
+
+# --------------------------------------------------------------------------
+# TACACS+ device admin (#24): deviceadmin + policy kind= + node enable
+# --------------------------------------------------------------------------
+import json as _json  # noqa: E402
+
+from mcp.server.fastmcp import FastMCP  # noqa: E402
+
+from ise_mcp.tools import deployment as _deployment  # noqa: E402
+from ise_mcp.tools import deviceadmin as _deviceadmin  # noqa: E402
+from ise_mcp.tools import network_devices as _netdev  # noqa: E402
+from ise_mcp.tools import policy as _policy  # noqa: E402
+
+
+def _reg(module, handler):
+    c = _client(handler)
+    m = FastMCP("t")
+    module.register(m, c, SpecCache(c))
+    return m
+
+
+def _call(m, tool, **args):
+    res = run(m.call_tool(tool, args))
+    return res[0][0].text if isinstance(res, tuple) else res[0].text
+
+
+def test_create_tacacs_command_set_body_and_id():
+    seen = {}
+
+    def handler(req):
+        seen["path"], seen["method"] = req.url.path, req.method
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/tacacscommandsets/abc-123"})
+
+    out = _call(_reg(_deviceadmin, handler), "ise_create_tacacs_command_set",
+                name="TAC-CmdSet-ReadOnly", permit_unmatched=False,
+                commands=[{"grant": "PERMIT", "command": "show", "arguments": "*"}])
+    assert seen["path"].endswith("/ers/config/tacacscommandsets")
+    cs = seen["body"]["TacacsCommandSets"]
+    assert cs["name"] == "TAC-CmdSet-ReadOnly" and cs["permitUnmatched"] is False
+    assert cs["commands"]["commandList"][0]["command"] == "show"
+    assert _json.loads(out)["id"] == "abc-123"  # Location -> id
+
+
+def test_create_tacacs_profile_sets_priv_lvl():
+    seen = {}
+
+    def handler(req):
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/tacacsprofile/p-9"})
+
+    _call(_reg(_deviceadmin, handler), "ise_create_tacacs_profile",
+          name="TAC_Shell_Priv15", privilege=15)
+    attrs = seen["body"]["TacacsProfile"]["sessionAttributes"]["sessionAttributeList"]
+    assert attrs == [{"type": "MANDATORY", "name": "priv-lvl", "value": "15"}]
+
+
+def test_network_device_tacacs_settings_added_when_secret_given():
+    seen = {}
+
+    def handler(req):
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/networkdevice/nd-1"})
+
+    _call(_reg(_netdev, handler), "ise_create_network_device", name="TAC-RTR",
+          ip="198.18.128.68", radius_shared_secret="r", tacacs_shared_secret="TACkey123")
+    nd = seen["body"]["NetworkDevice"]
+    assert nd["tacacsSettings"]["sharedSecret"] == "TACkey123"
+    assert nd["authenticationSettings"]["radiusSharedSecret"] == "r"
+
+
+def test_network_device_no_tacacs_settings_by_default():
+    seen = {}
+
+    def handler(req):
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/networkdevice/nd-2"})
+
+    _call(_reg(_netdev, handler), "ise_create_network_device", name="R", ip="1.1.1.1",
+          radius_shared_secret="r")
+    assert "tacacsSettings" not in seen["body"]["NetworkDevice"]
+
+
+def test_policy_base_helper():
+    assert _policy._base("device-admin").endswith("/device-admin")
+    assert _policy._base("network-access").endswith("/network-access")
+    with pytest.raises(ValueError):
+        _policy._base("bogus")
+
+
+def test_create_policy_set_device_admin_path_and_service():
+    seen = {}
+
+    def handler(req):
+        # the condition-name lookup GET (no body) hits /condition first
+        if req.method == "GET" and req.url.path.endswith("/condition"):
+            return httpx.Response(200, json=[{"id": "c1", "name": "TAC_Devices"}])
+        seen["path"] = req.url.path
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(200, json={"response": {"id": "ps-1"}})
+
+    _call(_reg(_policy, handler), "ise_create_policy_set", name="TAC-DeviceAdmin",
+          condition_name="TAC_Devices", kind="device-admin")
+    assert "/device-admin/policy-set" in seen["path"]
+    assert seen["body"]["serviceName"] == "Default Device Admin"
+
+
+def test_enable_device_admin_noop_when_present():
+    def handler(req):
+        return httpx.Response(200, json={
+            "hostname": "ise35", "roles": ["Standalone"],
+            "services": ["Profiler", "Session", "DeviceAdmin"], "nodeStatus": "Connected"})
+
+    out = _call(_reg(_deployment, handler), "ise_enable_device_admin", hostname="ise35")
+    d = _json.loads(out)
+    assert d["changed"] is False and "DeviceAdmin" in d["services"]
+
+
+def test_enable_device_admin_put_body_is_roles_services_only(monkeypatch):
+    seen = {"phase": "before"}
+
+    async def _no_sleep(_secs):
+        seen["phase"] = "after"  # next GET should report DeviceAdmin present
+
+    monkeypatch.setattr(_deployment.asyncio, "sleep", _no_sleep)
+
+    def handler(req):
+        if req.method == "GET":
+            services = (["Profiler", "Session", "DeviceAdmin"] if seen["phase"] == "after"
+                        else ["Profiler", "Session"])
+            return httpx.Response(200, json={
+                "hostname": "ise35", "roles": ["Standalone"], "fqdn": "ise35.x",
+                "ipAddress": "1.2.3.4", "services": services, "nodeStatus": "Connected"})
+        seen["put"] = _json.loads(req.content)  # PUT
+        return httpx.Response(200, json={})
+
+    out = _call(_reg(_deployment, handler), "ise_enable_device_admin", hostname="ise35",
+                wait_minutes=1)
+    assert set(seen["put"]) == {"roles", "services"}  # no fqdn/ipAddress/nodeStatus
+    assert seen["put"]["services"] == ["Profiler", "Session", "DeviceAdmin"]
+    assert _json.loads(out)["changed"] is True

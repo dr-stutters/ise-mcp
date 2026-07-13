@@ -105,7 +105,7 @@ async def roundtrip(mcp, label, *, create_tool, create_args, list_tool, name_val
 async def main(write: bool) -> int:
     mcp = build_server()
     tools = {t.name for t in await mcp.list_tools()}
-    assert len(tools) >= 108, f"expected >=108 tools, got {len(tools)}"
+    assert len(tools) >= 138, f"expected >=138 tools, got {len(tools)}"
     assert {"ise_version", "ise_check_surfaces", "ise_search_spec",
             "ise_openapi_call", "ise_ers_call", "ise_mnt_call"} <= tools
     print(f"server built: {len(tools)} tools\n")
@@ -124,10 +124,14 @@ async def main(write: bool) -> int:
              "ise_list_sponsor_portals", "ise_list_sponsor_groups",
              "ise_list_profiler_profiles", "ise_list_admin_users",
              "ise_list_active_directory", "ise_list_external_radius_servers",
-             "ise_list_custom_attributes", "ise_list_node_groups"]
+             "ise_list_custom_attributes", "ise_list_node_groups",
+             "ise_list_tacacs_command_sets", "ise_list_tacacs_profiles",
+             "ise_list_tacacs_external_servers", "ise_deviceadmin_command_sets"]
     for t in reads:
         await read_check(mcp, t)
     await read_check(mcp, "ise_get_node", hostname="ise")
+    await read_check(mcp, "ise_node_services", hostname="ise")
+    await read_check(mcp, "ise_list_policy_sets", kind="device-admin")
     await read_check(mcp, "ise_auth_status_by_mac", mac="AA:BB:CC:DD:EE:FF")
     await read_check(mcp, "ise_search_spec", query="endpoint", kind="paths")
     await read_check(mcp, "ise_get_definition", name="ERSEndPoint")
@@ -146,6 +150,21 @@ async def main(write: bool) -> int:
                                      radius_shared_secret="verifyOnly123"),
                     list_tool="ise_list_network_devices", name_val="zzz_it_nad",
                     del_tool="ise_delete_network_device", del_key="device_id")
+
+    # TACACS+ device admin (config plane; works without the node service enabled)
+    await roundtrip(mcp, "TACACS command set",
+                    create_tool="ise_create_tacacs_command_set",
+                    create_args=dict(name="zzz_it_cmdset", permit_unmatched=False,
+                                     commands=[{"grant": "PERMIT", "command": "show",
+                                                "arguments": "*"}]),
+                    list_tool="ise_list_tacacs_command_sets", name_val="zzz_it_cmdset",
+                    del_tool="ise_delete_tacacs_command_set", del_key="cs_id")
+
+    await roundtrip(mcp, "TACACS profile",
+                    create_tool="ise_create_tacacs_profile",
+                    create_args=dict(name="zzz_it_shell", privilege=7),
+                    list_tool="ise_list_tacacs_profiles", name_val="zzz_it_shell",
+                    del_tool="ise_delete_tacacs_profile", del_key="profile_id")
 
     used = {s.get("value") for s in as_list(safe(await call(mcp, "ise_list_sgts")))}
     val = next(v for v in range(3000, 5000) if v not in used)

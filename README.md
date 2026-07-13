@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (128)
+## Dedicated tools (140)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -52,7 +52,13 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
 `filter`.
 
 - **system / deployment** — `ise_version`, `ise_check_surfaces`,
-  `ise_deployment_nodes`, `ise_get_node`
+  `ise_deployment_nodes`, `ise_get_node`, `ise_node_services`,
+  `ise_enable_device_admin` (turn on the TACACS+ Device Admin persona)
+- **device admin (TACACS+)** — TACACS command sets (list/get/create/delete) and
+  shell profiles (privilege level) via ERS; device-admin policy sets + authZ rules
+  via the OpenAPI Policy surface (`ise_*_policy_set` / `*_authz_rule_raw` with
+  `kind="device-admin"`); NADs take a `tacacs_shared_secret`. See the TACACS+ note
+  under Test.
 - **endpoints** — list/get/create/update/delete endpoints (OpenAPI; create returns
   the id) + endpoint custom-attribute definitions (CRUD)
 - **trustsec** — SGTs create/list/get/delete, SGACLs create/list/get/delete,
@@ -155,6 +161,21 @@ uv run python tests/integration_test.py --write # + create/verify/delete round-t
 
 Verified against **ISE 3.4.0.608** and **ISE 3.5.0.527** — all three surfaces
 (OpenAPI, MnT, ERS-over-443) pass once ERS is enabled in API Settings.
+
+**TACACS+ device admin — config plane validated:** command sets (permit-all + a
+show/exit/enable read-only set), shell profiles (priv-lvl 15/1), a NAD with a
+`tacacs_shared_secret`, and a full device-admin policy set (`kind="device-admin"`)
+with two authZ rules were all created + read back live on ISE 3.5. Field notes:
+device-admin authZ rules take `commands` (a list of command-set names) + `profile`
+(a shell-profile name) and **require** a rule condition (no catch-all); the
+`DEVICE:Device IP Address` attribute is illegal for the device-admin scope (use
+`Device Type`); TACACS *profile* names allow only alphanumeric/underscore/space (no
+hyphens). **Caveat:** ISE only answers TACACS+ on TCP 49 once the **Device Admin
+service** is enabled on the node. `ise_enable_device_admin` sends the correct
+`NodeUpdateRequest`, but a **standalone** ISE node rejects the persona change over
+the API (`Exception occurred while making REST call`) — enable it in the GUI
+(Administration ▸ System ▸ Deployment ▸ *node* ▸ **Enable Device Admin Service**).
+Once on, a NAD's `test aaa group <grp> <user> <pw> new-code` returns Access-Accept.
 
 **NAD-side NAC is validated too:** MAB (`Wired_MAB` → `PermitAccess`) authenticates
 end-to-end against both 3.4 and 3.5 from a Catalyst 9000v access switch (NAD

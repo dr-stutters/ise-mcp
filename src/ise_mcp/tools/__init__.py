@@ -34,6 +34,7 @@ _TOOL_MODULES = (
     "endpoints",
     "trustsec",
     "policy",
+    "deviceadmin",
     "sessions",
     "operations",
     "certificates",

@@ -21,19 +21,35 @@ _DA = "/api/v1/policy/device-admin"
 _ERS_AP = "/ers/config/authorizationprofile"
 _ERS_DACL = "/ers/config/downloadableacl"
 
+# Default allowed-protocols service per policy kind.
+_DEFAULT_SERVICE = {"network-access": "Default Network Access",
+                    "device-admin": "Default Device Admin"}
+
+
+def _base(kind: str) -> str:
+    """OpenAPI policy base for 'network-access' (RADIUS) or 'device-admin' (TACACS+)."""
+    if kind not in ("network-access", "device-admin"):
+        raise ValueError("kind must be 'network-access' or 'device-admin'")
+    return _DA if kind == "device-admin" else _NA
+
 
 def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
-    async def _resolve_condition(condition_name, condition):
-        """Return a condition dict from raw JSON, a library-condition name, or None."""
+    async def _resolve_condition(condition_name, condition, kind="network-access"):
+        """Return a condition dict from raw JSON, a library-condition name, or None.
+
+        Library conditions are looked up in the matching (network-access or
+        device-admin) condition library.
+        """
         if condition:
             return json.loads(condition)
         if condition_name:
-            conds = await client.openapi("GET", f"{_NA}/condition")
+            conds = await client.openapi("GET", f"{_base(kind)}/condition")
             cl = conds if isinstance(conds, list) else conds.get("response", [])
             m = next((c for c in cl if c.get("name") == condition_name), None)
             if not m:
                 raise ValueError(
-                    f"library condition '{condition_name}' not found - see ise_list_conditions")
+                    f"library condition '{condition_name}' not found in {kind} - "
+                    "see ise_list_conditions")
             return {"conditionType": "ConditionReference", "isNegate": False,
                     "id": m["id"], "name": m["name"]}
         return None
@@ -77,9 +93,9 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
             "GET", f"{_NA}/authorization-profiles"))
 
     @mcp.tool()
-    async def ise_list_conditions() -> str:
-        """List reusable policy conditions (network-access)."""
-        return dumps(await client.openapi("GET", f"{_NA}/condition"))
+    async def ise_list_conditions(kind: str = "network-access") -> str:
+        """List reusable policy conditions (kind: 'network-access' | 'device-admin')."""
+        return dumps(await client.openapi("GET", f"{_base(kind)}/condition"))
 
     # ---- Authorization profiles (ERS) ----
     @mcp.tool()
@@ -175,10 +191,11 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     # ---- Policy sets + rules authoring (OpenAPI) ----
     @mcp.tool()
     async def ise_create_policy_set(name: str, description: str = "",
-                                    service_name: str = "Default Network Access",
+                                    service_name: str | None = None,
                                     condition_name: str | None = None,
-                                    condition: str | None = None) -> str:
-        """Create a network-access policy set (OpenAPI). Returns the created set.
+                                    condition: str | None = None,
+                                    kind: str = "network-access") -> str:
+        """Create a policy set (OpenAPI). Returns the created set.
 
         A policy set REQUIRES a condition (only the built-in Default may be
         condition-less). Provide one via `condition_name` (a library condition,
@@ -188,34 +205,38 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         Args:
             name: policy set name.
             description: optional.
-            service_name: allowed protocols / service (default 'Default Network Access').
+            service_name: allowed protocols / service. Defaults to
+                'Default Network Access' (RADIUS) or 'Default Device Admin' (TACACS+).
             condition_name: a library condition name to match (resolved for you).
             condition: raw condition JSON string (alternative to condition_name).
+            kind: 'network-access' (RADIUS, default) or 'device-admin' (TACACS+).
         """
-        cond = await _resolve_condition(condition_name, condition)
+        cond = await _resolve_condition(condition_name, condition, kind)
         if cond is None:
             raise ValueError("a policy set requires a condition - pass condition_name "
                              "(e.g. 'Wired_802.1X') or a condition JSON string")
         body: dict = {"name": name, "description": description,
-                      "serviceName": service_name, "isProxy": False, "condition": cond}
-        return dumps(await client.openapi("POST", f"{_NA}/policy-set", json_body=body))
+                      "serviceName": service_name or _DEFAULT_SERVICE[kind],
+                      "isProxy": False, "condition": cond}
+        return dumps(await client.openapi("POST", f"{_base(kind)}/policy-set", json_body=body))
 
     @mcp.tool()
-    async def ise_create_policy_set_raw(body: str) -> str:
-        """Create a policy set from a full JSON body (OpenAPI)."""
-        return dumps(await client.openapi("POST", f"{_NA}/policy-set",
+    async def ise_create_policy_set_raw(body: str, kind: str = "network-access") -> str:
+        """Create a policy set from a full JSON body (kind: 'network-access' | 'device-admin')."""
+        return dumps(await client.openapi("POST", f"{_base(kind)}/policy-set",
                                           json_body=json.loads(body)))
 
     @mcp.tool()
-    async def ise_update_policy_set_raw(policy_id: str, body: str) -> str:
+    async def ise_update_policy_set_raw(policy_id: str, body: str,
+                                        kind: str = "network-access") -> str:
         """Update a policy set from a full JSON body (OpenAPI PUT)."""
         return dumps(await client.openapi(
-            "PUT", f"{_NA}/policy-set/{policy_id}", json_body=json.loads(body)))
+            "PUT", f"{_base(kind)}/policy-set/{policy_id}", json_body=json.loads(body)))
 
     @mcp.tool()
-    async def ise_delete_policy_set(policy_id: str) -> str:
-        """Delete a policy set by id (OpenAPI)."""
-        return dumps(await client.openapi("DELETE", f"{_NA}/policy-set/{policy_id}"))
+    async def ise_delete_policy_set(policy_id: str, kind: str = "network-access") -> str:
+        """Delete a policy set by id (kind: 'network-access' | 'device-admin')."""
+        return dumps(await client.openapi("DELETE", f"{_base(kind)}/policy-set/{policy_id}"))
 
     @mcp.tool()
     async def ise_create_authz_rule(policy_id: str, name: str, profiles: list[str],
@@ -245,21 +266,30 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
             "POST", f"{_NA}/policy-set/{policy_id}/authorization", json_body=body))
 
     @mcp.tool()
-    async def ise_create_authz_rule_raw(policy_id: str, body: str) -> str:
-        """Create an authorization rule from a full JSON body (OpenAPI)."""
+    async def ise_create_authz_rule_raw(policy_id: str, body: str,
+                                        kind: str = "network-access") -> str:
+        """Create an authorization rule from a full JSON body (OpenAPI).
+
+        Use this for device-admin (TACACS+) rules: pass kind='device-admin' and a
+        body with `commandSets` (list of command-set names) and/or `profile` (a
+        shell-profile name) as the result, instead of network-access `profile`
+        (list of authZ profiles) + `securityGroup`.
+        """
         return dumps(await client.openapi(
-            "POST", f"{_NA}/policy-set/{policy_id}/authorization",
+            "POST", f"{_base(kind)}/policy-set/{policy_id}/authorization",
             json_body=json.loads(body)))
 
     @mcp.tool()
-    async def ise_update_authz_rule_raw(policy_id: str, rule_id: str, body: str) -> str:
+    async def ise_update_authz_rule_raw(policy_id: str, rule_id: str, body: str,
+                                        kind: str = "network-access") -> str:
         """Update an authorization rule from a full JSON body (OpenAPI PUT)."""
         return dumps(await client.openapi(
-            "PUT", f"{_NA}/policy-set/{policy_id}/authorization/{rule_id}",
+            "PUT", f"{_base(kind)}/policy-set/{policy_id}/authorization/{rule_id}",
             json_body=json.loads(body)))
 
     @mcp.tool()
-    async def ise_delete_authz_rule(policy_id: str, rule_id: str) -> str:
-        """Delete an authorization rule from a policy set (OpenAPI)."""
+    async def ise_delete_authz_rule(policy_id: str, rule_id: str,
+                                    kind: str = "network-access") -> str:
+        """Delete an authorization rule from a policy set (kind: net-access | device-admin)."""
         return dumps(await client.openapi(
-            "DELETE", f"{_NA}/policy-set/{policy_id}/authorization/{rule_id}"))
+            "DELETE", f"{_base(kind)}/policy-set/{policy_id}/authorization/{rule_id}"))

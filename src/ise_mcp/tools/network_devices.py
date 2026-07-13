@@ -47,6 +47,7 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         radius_shared_secret: str,
         mask: int = 32,
         description: str = "",
+        tacacs_shared_secret: str | None = None,
     ) -> str:
         """Onboard a network device (NAD) with a RADIUS shared secret (ERS).
 
@@ -56,19 +57,23 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
             radius_shared_secret: the RADIUS shared secret.
             mask: prefix length for the device IP entry (default 32).
             description: optional.
+            tacacs_shared_secret: optional TACACS+ shared secret. When set, the NAD
+                also gets tacacsSettings so it can be a TACACS+ device-admin client
+                (requires the Device Admin service enabled on the ISE node).
         """
-        body = {
-            "NetworkDevice": {
-                "name": name,
-                "description": description,
-                "NetworkDeviceIPList": [{"ipaddress": ip, "mask": mask}],
-                "authenticationSettings": {
-                    "radiusSharedSecret": radius_shared_secret,
-                    "enableKeyWrap": False,
-                },
-            }
+        nd: dict = {
+            "name": name,
+            "description": description,
+            "NetworkDeviceIPList": [{"ipaddress": ip, "mask": mask}],
+            "authenticationSettings": {
+                "radiusSharedSecret": radius_shared_secret,
+                "enableKeyWrap": False,
+            },
         }
-        return dumps(await client.ers("POST", _ND, json_body=body))
+        if tacacs_shared_secret is not None:
+            nd["tacacsSettings"] = {"sharedSecret": tacacs_shared_secret,
+                                    "connectModeOptions": "ON_LEGACY"}
+        return dumps(await client.ers("POST", _ND, json_body={"NetworkDevice": nd}))
 
     @mcp.tool()
     async def ise_create_network_device_raw(body: str) -> str:
