@@ -105,7 +105,7 @@ async def roundtrip(mcp, label, *, create_tool, create_args, list_tool, name_val
 async def main(write: bool) -> int:
     mcp = build_server()
     tools = {t.name for t in await mcp.list_tools()}
-    assert len(tools) >= 138, f"expected >=138 tools, got {len(tools)}"
+    assert len(tools) >= 152, f"expected >=152 tools, got {len(tools)}"
     assert {"ise_version", "ise_check_surfaces", "ise_search_spec",
             "ise_openapi_call", "ise_ers_call", "ise_mnt_call"} <= tools
     print(f"server built: {len(tools)} tools\n")
@@ -126,12 +126,15 @@ async def main(write: bool) -> int:
              "ise_list_active_directory", "ise_list_external_radius_servers",
              "ise_list_custom_attributes", "ise_list_node_groups",
              "ise_list_tacacs_command_sets", "ise_list_tacacs_profiles",
-             "ise_list_tacacs_external_servers", "ise_deviceadmin_command_sets"]
+             "ise_list_tacacs_external_servers", "ise_deviceadmin_command_sets",
+             "ise_list_posture_requirements", "ise_list_posture_policies"]
     for t in reads:
         await read_check(mcp, t)
     await read_check(mcp, "ise_get_node", hostname="ise")
     await read_check(mcp, "ise_node_services", hostname="ise")
     await read_check(mcp, "ise_list_policy_sets", kind="device-admin")
+    await read_check(mcp, "ise_list_posture_conditions", condition_type="file")
+    await read_check(mcp, "ise_get_posture_settings", setting="general")
     await read_check(mcp, "ise_auth_status_by_mac", mac="AA:BB:CC:DD:EE:FF")
     await read_check(mcp, "ise_search_spec", query="endpoint", kind="paths")
     await read_check(mcp, "ise_get_definition", name="ERSEndPoint")

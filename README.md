@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (140)
+## Dedicated tools (154)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -74,8 +74,12 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
   version/nodes/license/patch/backup/sessions dashboard)
 - **certificates** — system & trusted certificate inventory + management: generate
   CSR, import trusted cert, generate self-signed, delete certs/CSRs
-- **guest / sponsor (ERS)** — guest types, sponsor portals & groups (guest *users*
-  need a sponsor account)
+- **guest / sponsor (ERS)** — guest types, sponsor portals & groups; guest *users*
+  (create/delete, sponsor-authed); `ise_enable_sponsor_rest_access` toggles a sponsor
+  group's REST-API permission (the gate for API guest provisioning)
+- **posture (config)** — posture conditions (list/get/create-raw/delete by type),
+  requirements, and posture policies (raw-first — bodies are large + type-specific),
+  plus posture settings reads (general / reassessment / AUP / update)
 - **profiler (ERS)** — endpoint profiling policies (compact list + get; raw create/delete)
 - **rbac / admin** — admin users (ERS, 3.4+) and admin groups + admin-user create
   (OpenAPI Rbac Catalog, 3.5+; e.g. create an ERS-Admin account)
@@ -177,6 +181,22 @@ the API (`Exception occurred while making REST call`) — enable it in the GUI
 (Administration ▸ System ▸ Deployment ▸ *node* ▸ **Enable Device Admin Service**).
 Once on, a NAD's `test aaa group <grp> <user> <pw> new-code` returns Access-Accept.
 
+**Posture + guest — config-side validated:** posture conditions/requirements/policies
+and settings all read live on ISE 3.5; creates are raw-first (bodies are large and
+per-type — file conditions, for instance, need a `FilePath` enum like `root` plus a
+check-type-appropriate `Operator`). **The guest sponsor flow works end-to-end over
+the API** (beating the usual "sponsors are GUI-only" assumption): create an internal
+user in a sponsor identity group (e.g. `ALL_ACCOUNTS (default)`), grant the sponsor
+group REST access (`ise_enable_sponsor_rest_access` — off by default, and the exact
+gate for the 401 *"Sponsor does not have permission to access REST Apis"*), then
+POST `/ers/config/guestuser` **as the sponsor** (a separate sponsor-cred client — the
+admin-authed server always 401s here) with `guestType` + `portalId` +
+`guestInfo` (omit `password` to auto-generate) + `guestAccessInfo` (`fromDate`/`toDate`
+mandatory). Live: created a Contractor guest (`AWAITING_INITIAL_LOGIN`), read it back,
+and deleted it as the sponsor. Live *posture assessment* and *CWA/BYOD* need a
+posture-capable client (Windows/macOS Secure Client) — out of scope for Linux-only
+CML endpoints.
+
 **NAD-side NAC is validated too:** MAB (`Wired_MAB` → `PermitAccess`) authenticates
 end-to-end against both 3.4 and 3.5 from a Catalyst 9000v access switch (NAD
 onboarded + endpoint + authZ rule via these tools, auth confirmed on the switch and
@@ -217,8 +237,9 @@ RADIUS source, and the ERS `trustsecsettings` schema misspells its fields
   client certificate enrollment + approval) rather than Basic-auth REST, so it's
   a separate build: session/topic subscription, ANC (Adaptive Network Control)
   quarantine actions, and bulk session download. Not in v1.
-- Guest-user provisioning via a sponsor account (guest *users* are sponsor-gated;
-  guest types / sponsor portals & groups are already covered).
+- ~~Guest-user provisioning via a sponsor account~~ — **done** (sponsor-authed
+  create/get/delete proven end-to-end; `ise_enable_sponsor_rest_access` unlocks it).
+- Live posture assessment + CWA/BYOD flows (need a posture-capable OS client).
 
 ## Security notes
 

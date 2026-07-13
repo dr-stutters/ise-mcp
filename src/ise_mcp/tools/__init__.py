@@ -35,6 +35,7 @@ _TOOL_MODULES = (
     "trustsec",
     "policy",
     "deviceadmin",
+    "posture",
     "sessions",
     "operations",
     "certificates",

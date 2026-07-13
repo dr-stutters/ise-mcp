@@ -419,3 +419,68 @@ def test_enable_device_admin_put_body_is_roles_services_only(monkeypatch):
     assert set(seen["put"]) == {"roles", "services"}  # no fqdn/ipAddress/nodeStatus
     assert seen["put"]["services"] == ["Profiler", "Session", "DeviceAdmin"]
     assert _json.loads(out)["changed"] is True
+
+
+# --------------------------------------------------------------------------
+# posture (#25) routing + guest sponsor REST-access toggle
+# --------------------------------------------------------------------------
+from ise_mcp.tools import guest as _guest  # noqa: E402
+from ise_mcp.tools import posture as _posture  # noqa: E402
+
+
+def test_posture_condition_paths_by_type():
+    seen = {}
+
+    def handler(req):
+        seen.setdefault("paths", []).append((req.method, req.url.path))
+        return httpx.Response(200, json={"response": []})
+
+    m = _reg(_posture, handler)
+    run(m.call_tool("ise_list_posture_conditions", {"condition_type": "file"}))
+    run(m.call_tool("ise_list_posture_conditions", {"condition_type": "service"}))
+    run(m.call_tool("ise_get_posture_condition",
+                    {"condition_type": "file", "cond_id": "c1"}))
+    paths = seen["paths"]
+    assert ("GET", "/api/v1/posture/condition/file") in paths
+    assert ("GET", "/api/v1/posture/condition/service") in paths
+    assert ("GET", "/api/v1/posture/condition/file/c1") in paths
+
+
+def test_posture_settings_validated():
+    def handler(req):
+        return httpx.Response(200, json={"response": {}})
+
+    m = _reg(_posture, handler)
+    run(m.call_tool("ise_get_posture_settings", {"setting": "reassessment"}))
+    with pytest.raises(Exception):  # noqa: B017 - MCP wraps ValueError
+        run(m.call_tool("ise_get_posture_settings", {"setting": "bogus"}))
+
+
+def test_enable_sponsor_rest_access_sets_flag():
+    seen = {}
+
+    def handler(req):
+        p = req.url.path
+        if req.method == "GET" and p.endswith("/sponsorgroup"):
+            return httpx.Response(200, json={"SearchResult": {"total": 1, "resources": [
+                {"id": "sg-1", "name": "ALL_ACCOUNTS (default)"}]}})
+        if req.method == "GET" and p.endswith("/sponsorgroup/sg-1"):
+            return httpx.Response(200, json={"SponsorGroup": {
+                "id": "sg-1", "name": "ALL_ACCOUNTS (default)",
+                "otherPermissions": {"canDeleteGuestAccounts": True,
+                                     "canAccessViaRest": False}}})
+        seen["put"] = _json.loads(req.content)  # PUT
+        return httpx.Response(200, json={"UpdatedFieldsList": {}})
+
+    out = _call(_reg(_guest, handler), "ise_enable_sponsor_rest_access",
+                group_name="ALL_ACCOUNTS (default)", enable=True)
+    op = seen["put"]["SponsorGroup"]["otherPermissions"]
+    assert op["canAccessViaRest"] is True and op["canDeleteGuestAccounts"] is True
+    assert _json.loads(out)["canAccessViaRest"] is True
+
+
+def test_enable_sponsor_rest_access_unknown_group():
+    def handler(req):
+        return httpx.Response(200, json={"SearchResult": {"total": 0, "resources": []}})
+    with pytest.raises(Exception):  # noqa: B017
+        _call(_reg(_guest, handler), "ise_enable_sponsor_rest_access", group_name="nope")
