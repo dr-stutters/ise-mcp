@@ -36,6 +36,7 @@ _TOOL_MODULES = (
     "policy",
     "deviceadmin",
     "posture",
+    "anc",
     "sessions",
     "operations",
     "certificates",

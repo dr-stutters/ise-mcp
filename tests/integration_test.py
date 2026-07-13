@@ -105,7 +105,7 @@ async def roundtrip(mcp, label, *, create_tool, create_args, list_tool, name_val
 async def main(write: bool) -> int:
     mcp = build_server()
     tools = {t.name for t in await mcp.list_tools()}
-    assert len(tools) >= 152, f"expected >=152 tools, got {len(tools)}"
+    assert len(tools) >= 160, f"expected >=160 tools, got {len(tools)}"
     assert {"ise_version", "ise_check_surfaces", "ise_search_spec",
             "ise_openapi_call", "ise_ers_call", "ise_mnt_call"} <= tools
     print(f"server built: {len(tools)} tools\n")
@@ -127,7 +127,8 @@ async def main(write: bool) -> int:
              "ise_list_custom_attributes", "ise_list_node_groups",
              "ise_list_tacacs_command_sets", "ise_list_tacacs_profiles",
              "ise_list_tacacs_external_servers", "ise_deviceadmin_command_sets",
-             "ise_list_posture_requirements", "ise_list_posture_policies"]
+             "ise_list_posture_requirements", "ise_list_posture_policies",
+             "ise_list_anc_policies", "ise_list_anc_endpoints"]
     for t in reads:
         await read_check(mcp, t)
     await read_check(mcp, "ise_get_node", hostname="ise")
@@ -168,6 +169,12 @@ async def main(write: bool) -> int:
                     create_args=dict(name="zzz_it_shell", privilege=7),
                     list_tool="ise_list_tacacs_profiles", name_val="zzz_it_shell",
                     del_tool="ise_delete_tacacs_profile", del_key="profile_id")
+
+    await roundtrip(mcp, "ANC policy",
+                    create_tool="ise_create_anc_policy",
+                    create_args=dict(name="zzz_it_anc", action="QUARANTINE"),
+                    list_tool="ise_list_anc_policies", name_val="zzz_it_anc",
+                    del_tool="ise_delete_anc_policy", del_key="policy_id")
 
     used = {s.get("value") for s in as_list(safe(await call(mcp, "ise_list_sgts")))}
     val = next(v for v in range(3000, 5000) if v not in used)

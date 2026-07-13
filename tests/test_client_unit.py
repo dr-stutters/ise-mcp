@@ -484,3 +484,57 @@ def test_enable_sponsor_rest_access_unknown_group():
         return httpx.Response(200, json={"SearchResult": {"total": 0, "resources": []}})
     with pytest.raises(Exception):  # noqa: B017
         _call(_reg(_guest, handler), "ise_enable_sponsor_rest_access", group_name="nope")
+
+
+# --------------------------------------------------------------------------
+# ANC (#30) — policy body + apply/clear operation shape
+# --------------------------------------------------------------------------
+from ise_mcp.tools import anc as _anc  # noqa: E402
+
+
+def test_create_anc_policy_body_and_action():
+    seen = {}
+
+    def handler(req):
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/ancpolicy/anc-1"})
+
+    out = _call(_reg(_anc, handler), "ise_create_anc_policy",
+                name="ANC-Quarantine", action="QUARANTINE")
+    p = seen["body"]["ErsAncPolicy"]
+    assert p["name"] == "ANC-Quarantine" and p["actions"] == ["QUARANTINE"]
+    assert _json.loads(out)["id"] == "anc-1"
+
+
+def test_create_anc_policy_rejects_bad_action():
+    with pytest.raises(Exception):  # noqa: B017 - MCP wraps ValueError
+        _call(_reg(_anc, lambda _r: httpx.Response(200)),
+              "ise_create_anc_policy", name="x", action="NUKE")
+
+
+def test_apply_anc_operation_body():
+    seen = {}
+
+    def handler(req):
+        seen["path"] = req.url.path
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(204)
+
+    _call(_reg(_anc, handler), "ise_apply_anc",
+          mac="AA:BB:CC:DD:EE:FF", policy_name="ANC-Quarantine")
+    assert seen["path"].endswith("/ers/config/ancendpoint/apply")
+    data = {d["name"]: d["value"]
+            for d in seen["body"]["OperationAdditionalData"]["additionalData"]}
+    assert data == {"macAddress": "AA:BB:CC:DD:EE:FF", "policyName": "ANC-Quarantine"}
+
+
+def test_clear_anc_hits_clear_endpoint():
+    seen = {}
+
+    def handler(req):
+        seen["path"] = req.url.path
+        return httpx.Response(204)
+
+    _call(_reg(_anc, handler), "ise_clear_anc", mac="A", policy_name="ANC-Quarantine")
+    assert seen["path"].endswith("/ers/config/ancendpoint/clear")
