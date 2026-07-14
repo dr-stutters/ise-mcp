@@ -652,3 +652,78 @@ def test_create_identity_source_sequence_orders_stores_and_defaults_cert_profile
                                 {"idstore": "All_AD_Join_Points", "order": 2}]
     assert seq["certificateAuthenticationProfile"] == "Preloaded_Certificate_Profile"
     assert seq["breakOnStoreFail"] is False
+
+
+# --------------------------------------------------------------------------
+# MnT reports + endpoint bulk ops (#34)
+# --------------------------------------------------------------------------
+from ise_mcp.tools import endpoints as _endpoints  # noqa: E402
+from ise_mcp.tools import operations as _operations  # noqa: E402
+from ise_mcp.tools import sessions as _sessions  # noqa: E402
+
+
+def test_bulk_create_endpoints_array_body_and_group():
+    seen = {}
+
+    def handler(req):
+        seen["path"], seen["method"] = req.url.path, req.method
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(202, json={"id": "task-1"})
+
+    out = _call(_reg(_endpoints, handler), "ise_bulk_create_endpoints",
+                macs=["AA:BB:CC:00:00:01", "AA:BB:CC:00:00:02"], group_id="g-9")
+    assert seen["path"].endswith("/api/v1/endpoint/bulk") and seen["method"] == "POST"
+    assert isinstance(seen["body"], list) and len(seen["body"]) == 2
+    assert seen["body"][0]["mac"] == "AA:BB:CC:00:00:01"
+    assert seen["body"][0]["groupId"] == "g-9"
+    assert seen["body"][0]["staticGroupAssignment"] is True
+    assert _json.loads(out)["id"] == "task-1"
+
+
+def test_bulk_delete_endpoints_wraps_macs():
+    seen = {}
+
+    def handler(req):
+        seen["method"], seen["body"] = req.method, _json.loads(req.content)
+        return httpx.Response(202, json={"id": "task-2"})
+
+    _call(_reg(_endpoints, handler), "ise_bulk_delete_endpoints", macs=["AA:BB:CC:00:00:01"])
+    assert seen["method"] == "DELETE"
+    assert seen["body"] == {"endpoints": ["AA:BB:CC:00:00:01"]}
+
+
+def test_bulk_update_endpoints_sets_group_and_static():
+    seen = {}
+
+    def handler(req):
+        seen["method"], seen["body"] = req.method, _json.loads(req.content)
+        return httpx.Response(202, json={"id": "task-3"})
+
+    _call(_reg(_endpoints, handler), "ise_bulk_update_endpoints",
+          macs=["AA:BB:CC:00:00:01"], group_id="g-1")
+    assert seen["method"] == "PUT"
+    assert seen["body"][0] == {"mac": "AA:BB:CC:00:00:01", "groupId": "g-1",
+                               "staticGroupAssignment": True}
+
+
+def test_get_task_status_path():
+    seen = {}
+
+    def handler(req):
+        seen["path"] = req.url.path
+        return httpx.Response(200, json={"id": "t", "executionStatus": "COMPLETED_WITH_SUCCESS"})
+
+    _call(_reg(_operations, handler), "ise_get_task_status", task_id="abc-123")
+    assert seen["path"].endswith("/api/v1/task/abc-123")
+
+
+def test_recent_authentications_hits_mnt_authlist():
+    seen = {}
+
+    def handler(req):
+        seen["path"] = req.url.path
+        return httpx.Response(200, content=b"<sessions noOfActiveSession='0'/>",
+                              headers={"content-type": "application/xml"})
+
+    _call(_reg(_sessions, handler), "ise_recent_authentications")
+    assert seen["path"].endswith("/admin/API/mnt/Session/AuthList/null/null")

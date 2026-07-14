@@ -60,6 +60,16 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
         return dumps(await client.openapi("GET", "/api/v1/deployment/node-group"))
 
     @mcp.tool()
+    async def ise_get_task_status(task_id: str) -> str:
+        """Get the status of an async ISE task by id (OpenAPI /api/v1/task/{id}).
+
+        Tracks long-running / bulk operations - the id returned by the endpoint bulk
+        tools (ise_bulk_*_endpoints) and the certificate renew action. Reports
+        executionStatus (IN_PROGRESS / COMPLETED_WITH_SUCCESS / ...), moduleType and
+        resource/success/fail counts."""
+        return dumps(await client.openapi("GET", f"/api/v1/task/{task_id}"))
+
+    @mcp.tool()
     async def ise_system_summary() -> str:
         """One-call day-2 health dashboard: version, nodes, licensing, patches,
         last backup, and live session counts."""

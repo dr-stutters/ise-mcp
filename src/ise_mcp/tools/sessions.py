@@ -89,3 +89,11 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_failure_reasons() -> str:
         """Get the MnT failure-reasons dictionary (auth failure codes)."""
         return dumps(await client.mnt("/FailureReasons"))
+
+    @mcp.tool()
+    async def ise_recent_authentications() -> str:
+        """MnT recent-authentications report (/Session/AuthList) - the latest RADIUS
+        authentication events across the deployment (user/MAC, NAS, result), not just
+        currently-active sessions. Use ise_auth_status_by_mac for one endpoint's
+        pass/fail history."""
+        return dumps(await client.mnt("/Session/AuthList/null/null"))

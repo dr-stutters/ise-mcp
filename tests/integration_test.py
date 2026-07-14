@@ -105,7 +105,7 @@ async def roundtrip(mcp, label, *, create_tool, create_args, list_tool, name_val
 async def main(write: bool) -> int:
     mcp = build_server()
     tools = {t.name for t in await mcp.list_tools()}
-    assert len(tools) >= 179, f"expected >=179 tools, got {len(tools)}"
+    assert len(tools) >= 184, f"expected >=184 tools, got {len(tools)}"
     assert {"ise_version", "ise_check_surfaces", "ise_search_spec",
             "ise_openapi_call", "ise_ers_call", "ise_mnt_call"} <= tools
     print(f"server built: {len(tools)} tools\n")
@@ -131,7 +131,8 @@ async def main(write: bool) -> int:
              "ise_list_anc_policies", "ise_list_anc_endpoints",
              "ise_list_sxp_connections", "ise_list_sxp_vpns",
              "ise_list_sxp_local_bindings",
-             "ise_list_allowed_protocols", "ise_list_identity_source_sequences"]
+             "ise_list_allowed_protocols", "ise_list_identity_source_sequences",
+             "ise_recent_authentications"]
     for t in reads:
         await read_check(mcp, t)
     await read_check(mcp, "ise_get_node", hostname="ise")
@@ -276,6 +277,25 @@ async def main(write: bool) -> int:
                     create_args=dict(name="zzz_it_seq", id_stores=["Internal Users"]),
                     list_tool="ise_list_identity_source_sequences", name_val="zzz_it_seq",
                     del_tool="ise_delete_identity_source_sequence", del_key="seq_id")
+
+    # Endpoint bulk ops (#34): bulk create -> task status -> bulk delete (async)
+    try:
+        bmacs = ["BB:CC:DD:EE:00:01", "BB:CC:DD:EE:00:02"]
+        cr = safe(await call(mcp, "ise_bulk_create_endpoints", macs=bmacs))
+        tid = cr.get("id") if isinstance(cr, dict) else None
+        await asyncio.sleep(5)
+        st = safe(await call(mcp, "ise_get_task_status", task_id=tid))
+        ok_c = isinstance(st, dict) and st.get("successCount") == 2
+        dl = safe(await call(mcp, "ise_bulk_delete_endpoints", macs=bmacs))
+        dtid = dl.get("id") if isinstance(dl, dict) else None
+        await asyncio.sleep(5)
+        dst = safe(await call(mcp, "ise_get_task_status", task_id=dtid))
+        ok_d = isinstance(dst, dict) and dst.get("successCount") == 2
+        rec("endpoint bulk", "OK" if (tid and ok_c and dtid and ok_d) else "FAIL",
+            f"create/delete tasks succ={st.get('successCount') if isinstance(st, dict) else '?'}"
+            f"/{dst.get('successCount') if isinstance(dst, dict) else '?'}")
+    except Exception as e:  # noqa: BLE001
+        rec("endpoint bulk", "FAIL", e)
 
     # custom attribute + node group create/delete (name-keyed, OpenAPI)
     for label, create, cargs, list_tool, name, del_tool in [

@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (179)
+## Dedicated tools (184)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -60,7 +60,9 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
   `kind="device-admin"`); NADs take a `tacacs_shared_secret`. See the TACACS+ note
   under Test.
 - **endpoints** — list/get/create/update/delete endpoints (OpenAPI; create returns
-  the id) + endpoint custom-attribute definitions (CRUD)
+  the id) + endpoint custom-attribute definitions (CRUD) + **bulk** create/update/
+  delete by MAC list (`ise_bulk_*_endpoints`, e.g. mass MAB registration + static
+  group assignment) — each returns an async task id to poll with `ise_get_task_status`
 - **trustsec** — SGTs create/list/get/delete, SGACLs create/list/get/delete,
   egress matrix (SGT reads via OpenAPI; writes + SGACL/egress via ERS)
 - **trustsec SXP / IP-SGT** — IP-SGT static mappings (list/create/delete, OpenAPI)
@@ -83,9 +85,11 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
   ACLs, policy sets + authZ rules (condition resolved by name, e.g. `Wired_802.1X`)
 - **sessions / monitoring (MnT)** — active session count/list, session by
   MAC/IP/username (clean "no active session" when idle), session counts summary,
-  `ise_auth_status_by_mac` (recent auth attempts + pass/fail), failure reasons
+  `ise_auth_status_by_mac` (recent auth attempts + pass/fail), `ise_recent_authentications`
+  (deployment-wide recent-auth report), failure reasons
 - **operations (day-2)** — repositories, last-backup status, installed patches,
-  smart-licensing status, node groups, and `ise_system_summary` (one-call
+  smart-licensing status, node groups, `ise_get_task_status` (poll any async task:
+  bulk endpoint ops, certificate renew), and `ise_system_summary` (one-call
   version/nodes/license/patch/backup/sessions dashboard)
 - **certificates** — system & trusted certificate inventory + management: generate
   CSR, import trusted cert, generate self-signed, delete certs/CSRs
