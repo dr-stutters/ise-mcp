@@ -34,6 +34,7 @@ _TOOL_MODULES = (
     "endpoints",
     "trustsec",
     "policy",
+    "authn",
     "deviceadmin",
     "posture",
     "anc",

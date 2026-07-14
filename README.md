@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (170)
+## Dedicated tools (179)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -69,6 +69,11 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
   (`ise_list_sxp_local_bindings`) — how ISE advertises IP-SGT bindings to switches/
   firewalls (`sxpVersion` enum is `VERSION_1`..`VERSION_4`; a connection needs the
   hosting ISE node's hostname + IP)
+- **authn depth** — Allowed Protocols services (list/get/create/delete + `_raw`; the
+  convenience creator flips PAP/CHAP/MSCHAP/EAP-* on and auto-attaches ISE's default
+  inner-method block for each enabled tunnelled EAP method - a block must be present
+  iff its method is allowed) and Identity Source Sequences (list/get/create/delete;
+  ordered `id_stores` + a certificate authentication profile)
 - **ANC (adaptive network control)** — quarantine policies (create/list/delete)
   and apply/clear them on an endpoint by MAC (`ise_apply_anc`/`ise_clear_anc`);
   each issues a CoA, so a detection can contain an endpoint in seconds — the

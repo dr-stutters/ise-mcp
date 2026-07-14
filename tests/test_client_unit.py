@@ -593,3 +593,62 @@ def test_create_ip_sgt_mapping_formats_sgt_and_defaults_domain():
     assert seen["body"]["ipHost"] == "10.40.0.10"
     assert seen["body"]["sgt"] == "Employees (4/0004)"
     assert seen["body"]["sgtDomains"] == ["default"]
+
+
+# --------------------------------------------------------------------------
+# AuthN policy depth: allowed protocols + identity source sequences (#33)
+# --------------------------------------------------------------------------
+from ise_mcp.tools import authn as _authn  # noqa: E402
+
+
+def test_allowed_protocols_nested_block_present_only_when_method_enabled():
+    seen = {}
+
+    def handler(req):
+        seen["path"], seen["body"] = req.url.path, _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/allowedprotocols/ap-1"})
+
+    out = _call(_reg(_authn, handler), "ise_create_allowed_protocols",
+                name="EAP-TLS-only", allow_eap_tls=True, allow_ms_chap_v2=True)
+    ap = seen["body"]["AllowedProtocols"]
+    assert seen["path"].endswith("/ers/config/allowedprotocols")
+    assert ap["allowEapTls"] is True and ap["allowMsChapV2"] is True and ap["allowPeap"] is False
+    # ISE rejects both "allowed but settings missing" and "not allowed but settings
+    # not null" -> the nested block exists iff its method is enabled.
+    assert "eapTls" in ap
+    assert not any(k in ap for k in ("peap", "eapFast", "eapTtls", "teap"))
+    assert ap["requireMessageAuth"] is False  # mandatory scalar always sent
+    assert _json.loads(out)["id"] == "ap-1"
+
+
+def test_allowed_protocols_peap_attaches_default_block():
+    seen = {}
+
+    def handler(req):
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/allowedprotocols/ap-2"})
+
+    _call(_reg(_authn, handler), "ise_create_allowed_protocols", name="peap",
+          allow_peap=True)
+    ap = seen["body"]["AllowedProtocols"]
+    assert ap["allowPeap"] is True and ap["peap"]["allowPeapEapMsChapV2"] is True
+
+
+def test_create_identity_source_sequence_orders_stores_and_defaults_cert_profile():
+    seen = {}
+
+    def handler(req):
+        seen["path"], seen["body"] = req.url.path, _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/idstoresequence/seq-1"})
+
+    _call(_reg(_authn, handler), "ise_create_identity_source_sequence",
+          name="seq", id_stores=["Internal Users", "All_AD_Join_Points"])
+    seq = seen["body"]["IdStoreSequence"]
+    assert seen["path"].endswith("/ers/config/idstoresequence")
+    assert seq["idSeqItem"] == [{"idstore": "Internal Users", "order": 1},
+                                {"idstore": "All_AD_Join_Points", "order": 2}]
+    assert seq["certificateAuthenticationProfile"] == "Preloaded_Certificate_Profile"
+    assert seq["breakOnStoreFail"] is False

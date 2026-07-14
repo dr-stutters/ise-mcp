@@ -105,7 +105,7 @@ async def roundtrip(mcp, label, *, create_tool, create_args, list_tool, name_val
 async def main(write: bool) -> int:
     mcp = build_server()
     tools = {t.name for t in await mcp.list_tools()}
-    assert len(tools) >= 170, f"expected >=170 tools, got {len(tools)}"
+    assert len(tools) >= 179, f"expected >=179 tools, got {len(tools)}"
     assert {"ise_version", "ise_check_surfaces", "ise_search_spec",
             "ise_openapi_call", "ise_ers_call", "ise_mnt_call"} <= tools
     print(f"server built: {len(tools)} tools\n")
@@ -130,7 +130,8 @@ async def main(write: bool) -> int:
              "ise_list_posture_requirements", "ise_list_posture_policies",
              "ise_list_anc_policies", "ise_list_anc_endpoints",
              "ise_list_sxp_connections", "ise_list_sxp_vpns",
-             "ise_list_sxp_local_bindings"]
+             "ise_list_sxp_local_bindings",
+             "ise_list_allowed_protocols", "ise_list_identity_source_sequences"]
     for t in reads:
         await read_check(mcp, t)
     await read_check(mcp, "ise_get_node", hostname="ise")
@@ -261,6 +262,20 @@ async def main(write: bool) -> int:
         rec("SXP connection", "OK" if (cid and peer_ok and gone) else "FAIL", f"id={cid}")
     except Exception as e:  # noqa: BLE001
         rec("SXP connection", "FAIL", e)
+
+    # AuthN policy depth (#33): allowed protocols (EAP-TLS on) + id source sequence
+    await roundtrip(mcp, "allowed protocols",
+                    create_tool="ise_create_allowed_protocols",
+                    create_args=dict(name="zzz_it_ap", allow_eap_tls=True,
+                                     allow_ms_chap_v2=True),
+                    list_tool="ise_list_allowed_protocols", name_val="zzz_it_ap",
+                    del_tool="ise_delete_allowed_protocols", del_key="protocol_id")
+
+    await roundtrip(mcp, "identity source sequence",
+                    create_tool="ise_create_identity_source_sequence",
+                    create_args=dict(name="zzz_it_seq", id_stores=["Internal Users"]),
+                    list_tool="ise_list_identity_source_sequences", name_val="zzz_it_seq",
+                    del_tool="ise_delete_identity_source_sequence", del_key="seq_id")
 
     # custom attribute + node group create/delete (name-keyed, OpenAPI)
     for label, create, cargs, list_tool, name, del_tool in [
