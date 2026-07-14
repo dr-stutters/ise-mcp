@@ -21,6 +21,7 @@ _SGT_READ = "/api/v1/policy/network-access/security-groups"  # OpenAPI, read-onl
 _SGT = "/ers/config/sgt"                       # ERS, full CRUD
 _SGACL = "/ers/config/sgacl"                   # ERS
 _EMC = "/ers/config/egressmatrixcell"          # ERS
+_IPSGT = "/api/v1/trustsec/ip-sgt-mapping"     # OpenAPI TrustSec (feeds SXP/pxGrid)
 
 
 def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
@@ -91,3 +92,38 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_list_egress_matrix() -> str:
         """List the TrustSec egress matrix cells (src SGT x dst SGT -> SGACLs). ERS."""
         return dumps(await client.ers_list_all(_EMC))
+
+    @mcp.tool()
+    async def ise_list_ip_sgt_mappings() -> str:
+        """List ISE IP-SGT static mappings (OpenAPI TrustSec). These populate ISE's SXP
+        binding DB and are advertised over SXP / published to pxGrid subscribers such as
+        FMC/FTD - the supported way to feed FMC ACP (Snort) SGT enforcement."""
+        return dumps(await client.openapi("GET", _IPSGT))
+
+    @mcp.tool()
+    async def ise_create_ip_sgt_mapping(ip_host: str, sgt_name: str, sgt_value: int,
+                                        sgt_domains: list[str] | None = None) -> str:
+        """Create an IP-SGT static mapping (OpenAPI TrustSec); returns the new id.
+
+        Maps an IP to an SGT inside one or more SXP domains, so ISE advertises it over SXP
+        and publishes it to pxGrid subscribers (e.g. FMC learns it -> pushes to FTD Snort).
+
+        Args:
+            ip_host: literal IP address, e.g. "10.40.0.10" (uses the `ipHost` field; the
+                `ipOrHost` field is treated as an FQDN and would need resolvingNodes).
+            sgt_name: SGT name, e.g. "Employees".
+            sgt_value: SGT numeric tag, e.g. 4.
+            sgt_domains: SXP domains to place the mapping in; defaults to ["default"]
+                (one of sgt_domains / deployToDevices is mandatory - ISE 500s otherwise).
+        """
+        body = {
+            "ipHost": ip_host,
+            "sgt": f"{sgt_name} ({sgt_value}/{sgt_value:04d})",
+            "sgtDomains": sgt_domains or ["default"],
+        }
+        return dumps(await client.openapi("POST", _IPSGT, json_body=body))
+
+    @mcp.tool()
+    async def ise_delete_ip_sgt_mapping(mapping_id: str) -> str:
+        """Delete an IP-SGT static mapping by id (OpenAPI TrustSec)."""
+        return dumps(await client.openapi("DELETE", f"{_IPSGT}/{mapping_id}"))
