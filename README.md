@@ -157,6 +157,9 @@ Standalone, just describe what you want:
 
 > "Who's authenticated right now, and why did aa:bb:cc:dd:ee:ff fail?"
 
+See **[EXAMPLE_PROMPT.md](EXAMPLE_PROMPT.md)** for a full end-to-end scenario plus
+focused per-area prompts (NAD onboarding, TrustSec/SXP, TACACS+, bulk endpoints, ANC).
+
 Call **`ise_check_surfaces`** first — it reports which of the three surfaces
 answer (and whether ERS is enabled) before anything else is attempted.
 
@@ -169,7 +172,7 @@ uv run python tests/integration_test.py         # full read-only suite (live)
 uv run python tests/integration_test.py --write # + create/verify/delete round-trips
 ```
 
-- **`tests/test_client_unit.py`** — 22 ISE-free unit tests (httpx `MockTransport`):
+- **`tests/test_client_unit.py`** — 49 ISE-free unit tests (httpx `MockTransport`):
   XML→dict parsing, ERS `Location`-id extraction, the "ERS not enabled" `/admin/`
   redirect, error-message extraction, content-type dispatch, CSRF fetch+retry,
   transport-error wrapping + retry, `ers_list_all` paging, config loading, and
