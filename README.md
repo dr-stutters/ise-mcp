@@ -42,7 +42,7 @@ every endpoint, this server fetches, caches, and searches them:
 So new/rare endpoints work without a code change — find the path + schema, then
 call it.
 
-## Dedicated tools (161)
+## Dedicated tools (170)
 
 Every read tool plus create→verify→delete round-trips for all writable resources
 (NAD, endpoint, SGT, SGACL, internal user, dACL, authZ profile, device/identity/
@@ -63,6 +63,12 @@ GET-merge-PUT), and high-traffic lists (NADs, internal users, endpoints) take a
   the id) + endpoint custom-attribute definitions (CRUD)
 - **trustsec** — SGTs create/list/get/delete, SGACLs create/list/get/delete,
   egress matrix (SGT reads via OpenAPI; writes + SGACL/egress via ERS)
+- **trustsec SXP / IP-SGT** — IP-SGT static mappings (list/create/delete, OpenAPI)
+  and SXP peer connections (list/get/create/delete, ERS) as SPEAKER/LISTENER, plus
+  SXP domains (`ise_list_sxp_vpns`) and the SXP static-binding view
+  (`ise_list_sxp_local_bindings`) — how ISE advertises IP-SGT bindings to switches/
+  firewalls (`sxpVersion` enum is `VERSION_1`..`VERSION_4`; a connection needs the
+  hosting ISE node's hostname + IP)
 - **ANC (adaptive network control)** — quarantine policies (create/list/delete)
   and apply/clear them on an endpoint by MAC (`ise_apply_anc`/`ise_clear_anc`);
   each issues a CoA, so a detection can contain an endpoint in seconds — the

@@ -22,6 +22,9 @@ _SGT = "/ers/config/sgt"                       # ERS, full CRUD
 _SGACL = "/ers/config/sgacl"                   # ERS
 _EMC = "/ers/config/egressmatrixcell"          # ERS
 _IPSGT = "/api/v1/trustsec/ip-sgt-mapping"     # OpenAPI TrustSec (feeds SXP/pxGrid)
+_SXP_CONN = "/ers/config/sxpconnections"       # ERS SXP peer connections
+_SXP_VPN = "/ers/config/sxpvpns"               # ERS SXP domains
+_SXP_BIND = "/ers/config/sxplocalbindings"     # ERS SXP static IP-SGT bindings (SXP view)
 
 
 def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
@@ -127,3 +130,77 @@ def register(mcp: FastMCP, client: ISEClient, spec: SpecCache) -> None:
     async def ise_delete_ip_sgt_mapping(mapping_id: str) -> str:
         """Delete an IP-SGT static mapping by id (OpenAPI TrustSec)."""
         return dumps(await client.openapi("DELETE", f"{_IPSGT}/{mapping_id}"))
+
+    # ------------------------------------------------------------------
+    # SXP (SGT eXchange Protocol): peer connections, domains, bindings. ERS.
+    # ------------------------------------------------------------------
+    @mcp.tool()
+    async def ise_list_sxp_connections() -> str:
+        """List SXP peer connections (ERS). Each is an SXP session ISE maintains with
+        a network device (switch/router/firewall) as SPEAKER (ISE advertises its
+        IP-SGT bindings) or LISTENER (ISE learns the peer's bindings)."""
+        return dumps(await client.ers_list_all(_SXP_CONN))
+
+    @mcp.tool()
+    async def ise_get_sxp_connection(connection_id: str) -> str:
+        """Get one SXP peer connection by id (ERS)."""
+        return dumps(await client.ers("GET", f"{_SXP_CONN}/{connection_id}"))
+
+    @mcp.tool()
+    async def ise_create_sxp_connection(sxp_peer: str, ise_node: str, ise_node_ip: str,
+                                        sxp_mode: str = "SPEAKER",
+                                        sxp_vpn: str = "default",
+                                        sxp_version: str = "VERSION_4",
+                                        enabled: bool = True,
+                                        description: str = "") -> str:
+        """Create an SXP peer connection (ERS); returns the new connection's id.
+
+        ISE opens an SXP session to `sxp_peer`. As a SPEAKER, ISE advertises its
+        static IP-SGT bindings (see ise_list_sxp_local_bindings / the IP-SGT
+        mapping tools) to the peer; as a LISTENER, ISE learns the peer's bindings.
+        The SXP service must be enabled on the ISE node.
+
+        Args:
+            sxp_peer: peer device IP, e.g. "10.50.0.2".
+            ise_node: the ISE node hostname hosting the connection, e.g. "ise35"
+                (ERS-required; see ise_deployment_nodes).
+            ise_node_ip: that node's IP, e.g. "198.18.134.35" (ERS-required).
+            sxp_mode: "SPEAKER" (ISE advertises) or "LISTENER" (ISE learns).
+            sxp_vpn: SXP domain name; defaults to "default" (see ise_list_sxp_vpns).
+            sxp_version: SXP protocol enum, one of VERSION_1..VERSION_4
+                (default "VERSION_4").
+            enabled: administratively up (default True).
+            description: optional.
+
+        The shared SXP password comes from ISE's global TrustSec SXP settings, not
+        this call.
+        """
+        body = {"ERSSxpConnection": {
+            "sxpPeer": sxp_peer,
+            "sxpVpn": sxp_vpn,
+            "sxpNode": ise_node,
+            "ipAddress": ise_node_ip,
+            "sxpMode": sxp_mode,
+            "sxpVersion": sxp_version,
+            "enabled": enabled,
+            "description": description,
+        }}
+        return dumps(await client.ers("POST", _SXP_CONN, json_body=body))
+
+    @mcp.tool()
+    async def ise_delete_sxp_connection(connection_id: str) -> str:
+        """Delete an SXP peer connection by id (ERS)."""
+        return dumps(await client.ers("DELETE", f"{_SXP_CONN}/{connection_id}"))
+
+    @mcp.tool()
+    async def ise_list_sxp_vpns() -> str:
+        """List SXP domains/VPNs (ERS). SXP connections and local bindings are scoped
+        to a domain; "default" always exists."""
+        return dumps(await client.ers_list_all(_SXP_VPN))
+
+    @mcp.tool()
+    async def ise_list_sxp_local_bindings() -> str:
+        """List SXP static IP-SGT local bindings (ERS view). Same underlying data as
+        the OpenAPI IP-SGT mappings (ise_list_ip_sgt_mappings) but scoped by SXP
+        domain (sxpVpn) - these are what ISE advertises to SPEAKER-mode peers."""
+        return dumps(await client.ers_list_all(_SXP_BIND))

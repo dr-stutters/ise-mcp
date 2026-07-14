@@ -105,7 +105,7 @@ async def roundtrip(mcp, label, *, create_tool, create_args, list_tool, name_val
 async def main(write: bool) -> int:
     mcp = build_server()
     tools = {t.name for t in await mcp.list_tools()}
-    assert len(tools) >= 160, f"expected >=160 tools, got {len(tools)}"
+    assert len(tools) >= 170, f"expected >=170 tools, got {len(tools)}"
     assert {"ise_version", "ise_check_surfaces", "ise_search_spec",
             "ise_openapi_call", "ise_ers_call", "ise_mnt_call"} <= tools
     print(f"server built: {len(tools)} tools\n")
@@ -128,7 +128,9 @@ async def main(write: bool) -> int:
              "ise_list_tacacs_command_sets", "ise_list_tacacs_profiles",
              "ise_list_tacacs_external_servers", "ise_deviceadmin_command_sets",
              "ise_list_posture_requirements", "ise_list_posture_policies",
-             "ise_list_anc_policies", "ise_list_anc_endpoints"]
+             "ise_list_anc_policies", "ise_list_anc_endpoints",
+             "ise_list_sxp_connections", "ise_list_sxp_vpns",
+             "ise_list_sxp_local_bindings"]
     for t in reads:
         await read_check(mcp, t)
     await read_check(mcp, "ise_get_node", hostname="ise")
@@ -242,6 +244,23 @@ async def main(write: bool) -> int:
         rec("SGT update (PUT)", "OK" if ok else "FAIL", f"id={sid}")
     except Exception as e:  # noqa: BLE001
         rec("SGT update (PUT)", "FAIL", e)
+
+    # SXP peer connection (id-keyed, not name; needs the ISE node hostname + IP)
+    try:
+        nodes = as_list(safe(await call(mcp, "ise_deployment_nodes")))
+        node = next((n for n in nodes if isinstance(n, dict) and n.get("hostname")), {})
+        c = safe(await call(mcp, "ise_create_sxp_connection", sxp_peer="10.255.255.241",
+                            ise_node=node.get("hostname"), ise_node_ip=node.get("ipAddress"),
+                            description="zzz_it_sxp"))
+        cid = c.get("id") if isinstance(c, dict) else None
+        got = safe(await call(mcp, "ise_get_sxp_connection", connection_id=cid))
+        peer_ok = got.get("ERSSxpConnection", {}).get("sxpPeer") == "10.255.255.241"
+        await call(mcp, "ise_delete_sxp_connection", connection_id=cid)
+        gone = cid not in {x.get("id") for x
+                           in as_list(safe(await call(mcp, "ise_list_sxp_connections")))}
+        rec("SXP connection", "OK" if (cid and peer_ok and gone) else "FAIL", f"id={cid}")
+    except Exception as e:  # noqa: BLE001
+        rec("SXP connection", "FAIL", e)
 
     # custom attribute + node group create/delete (name-keyed, OpenAPI)
     for label, create, cargs, list_tool, name, del_tool in [

@@ -538,3 +538,58 @@ def test_clear_anc_hits_clear_endpoint():
 
     _call(_reg(_anc, handler), "ise_clear_anc", mac="A", policy_name="ANC-Quarantine")
     assert seen["path"].endswith("/ers/config/ancendpoint/clear")
+
+
+# --------------------------------------------------------------------------
+# TrustSec SXP + IP-SGT mappings (#32)
+# --------------------------------------------------------------------------
+from ise_mcp.tools import trustsec as _trustsec  # noqa: E402
+
+
+def test_create_sxp_connection_body_and_id():
+    seen = {}
+
+    def handler(req):
+        seen["path"], seen["method"] = req.url.path, req.method
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(201, headers={
+            "Location": "https://ise.example.com/ers/config/sxpconnections/sxp-77"})
+
+    out = _call(_reg(_trustsec, handler), "ise_create_sxp_connection",
+                sxp_peer="10.50.0.2", ise_node="ise35", ise_node_ip="198.18.134.35")
+    assert seen["path"].endswith("/ers/config/sxpconnections")
+    conn = seen["body"]["ERSSxpConnection"]
+    # verified live: sxpNode + ipAddress both required, version enum is VERSION_n
+    assert conn["sxpPeer"] == "10.50.0.2"
+    assert conn["sxpNode"] == "ise35" and conn["ipAddress"] == "198.18.134.35"
+    assert conn["sxpMode"] == "SPEAKER" and conn["sxpVersion"] == "VERSION_4"
+    assert conn["sxpVpn"] == "default" and conn["enabled"] is True
+    assert _json.loads(out)["id"] == "sxp-77"  # Location -> id
+
+
+def test_list_sxp_connections_hits_ers_path():
+    seen = {}
+
+    def handler(req):
+        seen["path"] = req.url.path
+        return httpx.Response(200, json={"SearchResult": {"resources": []}})
+
+    _call(_reg(_trustsec, handler), "ise_list_sxp_connections")
+    assert seen["path"].endswith("/ers/config/sxpconnections")
+
+
+def test_create_ip_sgt_mapping_formats_sgt_and_defaults_domain():
+    seen = {}
+
+    def handler(req):
+        seen["path"] = req.url.path
+        seen["body"] = _json.loads(req.content)
+        return httpx.Response(200, json={"id": "m-1"})
+
+    _call(_reg(_trustsec, handler), "ise_create_ip_sgt_mapping",
+          ip_host="10.40.0.10", sgt_name="Employees", sgt_value=4)
+    assert seen["path"].endswith("/api/v1/trustsec/ip-sgt-mapping")
+    # ISE wants the SGT as "Name (tag/0-padded-tag)" and a non-null domain list
+    assert seen["body"]["ipHost"] == "10.40.0.10"
+    assert seen["body"]["sgt"] == "Employees (4/0004)"
+    assert seen["body"]["sgtDomains"] == ["default"]
