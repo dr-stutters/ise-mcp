@@ -121,6 +121,8 @@ cd ise-mcp && uv sync
 
 Copy `.env.example` to `.env` (gitignored) and set:
 
+> **Suite users:** these values can instead live in a shared `../.env` one level above the repos, read by every companion MCP — precedence: process env > this repo's `.env` > the shared `../.env`. See the [cml-mcp](https://github.com/dr-stutters/cml-mcp) hub.
+
 ```ini
 ISE_URL=https://198.18.129.30      # ISE admin/PAN node
 ISE_USERNAME=admin
