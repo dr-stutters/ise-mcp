@@ -4,9 +4,33 @@ MCP server for **Cisco Identity Services Engine (ISE)** — identity, NAC, and
 TrustSec automation over ISE's REST APIs. Python 3.11+, [uv](https://docs.astral.sh/uv/),
 FastMCP, async httpx.
 
-Sibling to [`cml-mcp`](../CML_MCP) and [`firepower-mcp`](../Firepower_MCP); wired
-into the CML MCP project as the `ise` server (see `CML_MCP/.mcp.json`), where the
-**ise-engineer** agent drives its `mcp__ise__*` tools.
+Sibling to [`cml-mcp`](../CML_MCP) and the other suite MCPs ([`firepower-mcp`](../Firepower_MCP),
+[`windows-mcp`](../Windows_MCP), [`splunk-mcp`](../Splunk_MCP), [`wlc-mcp`](../WLC_MCP),
+[`catalyst-center-mcp`](../catalyst-center-mcp)); wired into the CML MCP project as the `ise`
+server (see `CML_MCP/.mcp.json`), where the **ise-engineer** agent drives its `mcp__ise__*` tools.
+
+## In the suite — ISE's integration points
+
+ISE is the identity/NAC hub the rest of the stack plugs into. In the
+[cml-mcp](https://github.com/dr-stutters/cml-mcp) suite these edges are built and validated
+end-to-end (see the [suite integration map](https://github.com/dr-stutters/cml-mcp#suite-integration-map)):
+
+- **Windows AD → ISE** (with [windows-mcp](https://github.com/dr-stutters/windows-mcp)) — AD
+  join makes `mitchcloud.lab` an external identity store; users authenticate 802.1X
+  (PEAP-MSCHAPv2, EAP-TLS) against AD.
+- **Windows AD CS → ISE** (with windows-mcp) — the **MitchcloudCA** signs ISE's system certs
+  (EAP-TLS, admin, pxGrid, TACACS-over-TLS): `ise_generate_csr` → `win_sign_csr` →
+  `ise_import_trusted_cert`. DNS from the DC gives ISE resolvable CSR names + FQDN.
+- **ISE → FMC over pxGrid** (with [firepower-mcp](https://github.com/dr-stutters/firepower-mcp))
+  — ISE publishes **SGTs** and **Session Directory** (user↔IP); FMC consumes both for
+  SGT-aware and **passive-identity** firewall rules.
+- **ISE ↔ switches / WLC** (with cml-mcp / [wlc-mcp](https://github.com/dr-stutters/wlc-mcp))
+  — RADIUS (802.1X/MAB, SGT authz) and TACACS+ (device admin, incl. **TACACS-over-TLS**); NADs
+  onboarded via `ise_create_network_device`, live sessions read over MnT.
+- **ISE ↔ Catalyst Center** (with [catalyst-center-mcp](https://github.com/dr-stutters/catalyst-center-mcp))
+  — pxGrid / ERS TrustSec sharing so CatC can author group-based access policy.
+- **ISE → Splunk** (with [splunk-mcp](https://github.com/dr-stutters/splunk-mcp)) —
+  auth/accounting logs into the SIEM via the Cisco ISE Splunkbase add-on.
 
 ## Three API surfaces, one client
 
