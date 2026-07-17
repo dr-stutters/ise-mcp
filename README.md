@@ -21,9 +21,12 @@ end-to-end (see the [suite integration map](https://github.com/dr-stutters/cml-m
 - **Windows AD CS → ISE** (with windows-mcp) — the **MitchcloudCA** signs ISE's system certs
   (EAP-TLS, admin, pxGrid, TACACS-over-TLS): `ise_generate_csr` → `win_sign_csr` →
   `ise_import_trusted_cert`. DNS from the DC gives ISE resolvable CSR names + FQDN.
-- **ISE → FMC over pxGrid** (with [firepower-mcp](https://github.com/dr-stutters/firepower-mcp))
-  — ISE publishes **SGTs** and **Session Directory** (user↔IP); FMC consumes both for
-  SGT-aware and **passive-identity** firewall rules.
+- **ISE ↔ FMC over pxGrid** (with [firepower-mcp](https://github.com/dr-stutters/firepower-mcp))
+  — ISE publishes **SGTs** and **Session Directory** (user↔IP) that FMC consumes for SGT-aware
+  and **passive-identity** firewall rules; and, in reverse, FMC drives **Rapid Threat
+  Containment** — its correlation engine **auto-applies an ISE ANC quarantine** to a bad endpoint
+  over **pxGrid EPS** → CoA bounces the session. (The FMC pxGrid client must be in ISE's **`ANC`**
+  pxGrid client-group for the ANC/EPS reach.)
 - **ISE ↔ switches / WLC** (with cml-mcp / [wlc-mcp](https://github.com/dr-stutters/wlc-mcp))
   — RADIUS (802.1X/MAB, SGT authz) and TACACS+ (device admin, incl. **TACACS-over-TLS**); NADs
   onboarded via `ise_create_network_device`, live sessions read over MnT.
